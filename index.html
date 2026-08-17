@@ -24,15 +24,13 @@
     --radius:20px;
     --grad1:#23305a;
     --grad2:#2c1f45;
-    --grad1-op:0.45;
-    --grad2-op:0.40;
   }
   *{box-sizing:border-box;}
   body{
     margin:0; min-height:100vh; padding:22px 14px 60px;
     background:
-      radial-gradient(circle at 15% 0%, var(--grad1) 0%, transparent var(--grad1-op,45%)),
-      radial-gradient(circle at 100% 20%, var(--grad2) 0%, transparent var(--grad2-op,40%)),
+      radial-gradient(circle at 15% 0%, var(--grad1) 0%, transparent 45%),
+      radial-gradient(circle at 100% 20%, var(--grad2) 0%, transparent 40%),
       var(--bg-deep);
     font-family:'Poppins', sans-serif; color:var(--ink);
     transition:background 1.2s ease;
