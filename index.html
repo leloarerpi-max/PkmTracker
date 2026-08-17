@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pokémon GPS Go</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#141a29;
+    --bg-card:#1f2740;
+    --bg-panel:#262f4d;
+    --line:#374266;
+    --red:#ef4d5e;
+    --red-dark:#c73b4a;
+    --green:#4fd88a;
+    --gold:#ffcd3c;
+    --blue:#6ee7ff;
+    --ink:#eef1fb;
+    --ink-dim:#8b93b8;
+    --radius:20px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; padding:22px 14px 60px;
+    background:
+      radial-gradient(circle at 15% 0%, #23305a 0%, transparent 45%),
+      radial-gradient(circle at 100% 20%, #2c1f45 0%, transparent 40%),
+      var(--bg-deep);
+    font-family:'Poppins', sans-serif; color:var(--ink);
+  }
+  .pixel{ font-family:'Press Start 2P', monospace; }
+
+  .card{
+    background:var(--bg-card); max-width:460px; margin:0 auto;
+    border-radius:var(--radius); padding:22px 20px 26px;
+    border:1px solid var(--line);
+    box-shadow:0 25px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.03);
+    position:relative; overflow:hidden;
+  }
+  .card::before{
+    content:""; position:absolute; top:-60px; right:-60px; width:180px; height:180px;
+    background:radial-gradient(circle, rgba(239,77,94,0.18), transparent 70%);
+    pointer-events:none;
+  }
+
+  header.top{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .ball-logo{ width:30px; height:30px; flex:none; }
+  h1{ font-size:1.05em; margin:0; letter-spacing:0.5px; }
+  .sub{ color:var(--ink-dim); font-size:0.72em; margin-top:2px; }
+
+  .meta-row{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .chip{ display:flex; align-items:center; gap:6px; background:var(--bg-panel);
+    border:1px solid var(--line); padding:6px 10px; border-radius:14px; font-size:0.8em; font-weight:600; }
+  .chip svg{ width:16px; height:16px; }
+
+  /* Trainer / XP */
+  .trainer-row{ margin-top:16px; }
+  .trainer-row .labels{ display:flex; justify-content:space-between; font-size:0.72em; color:var(--ink-dim); margin-bottom:5px; }
+  .xp-track{ height:8px; border-radius:6px; background:var(--bg-panel); overflow:hidden; border:1px solid var(--line);}
+  .xp-fill{ height:100%; width:0%; background:linear-gradient(90deg,#6ee7ff,#7c8cff); transition:width .5s ease; }
+
+  /* Distance / radar */
+  .radar-wrap{ display:flex; align-items:center; gap:16px; margin-top:18px; background:var(--bg-panel);
+    border:1px solid var(--line); border-radius:16px; padding:14px 16px; }
+  .radar{ position:relative; width:76px; height:76px; flex:none; }
+  .radar svg{ transform:rotate(-90deg); }
+  .radar .center{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .radar .center span{ font-size:1.3em; }
+  .radar-text{ flex:1; }
+  .km-big{ font-size:1.55em; font-weight:800; line-height:1; }
+  .km-unit{ font-size:0.6em; color:var(--ink-dim); font-weight:600; }
+  .target-line{ margin-top:6px; font-size:0.78em; color:var(--ink-dim); }
+  .target-line b{ color:var(--ink); }
+
+  #status{ font-size:0.75em; color:var(--ink-dim); text-align:center; margin-top:10px; min-height:1.2em; }
+
+  .test-btn{ display:block; margin:6px auto 0; background:transparent; border:1px dashed var(--line);
+    color:var(--ink-dim); font-size:0.72em; padding:6px 12px; border-radius:10px; cursor:pointer; }
+  .test-btn:hover{ color:var(--ink); border-color:var(--blue); }
+
+  /* Quests */
+  .quests{ margin-top:16px; background:var(--bg-panel); border:1px solid var(--line); border-radius:16px; padding:12px 14px; }
+  .quests h3{ font-size:0.82em; margin:0 0 8px; display:flex; align-items:center; gap:6px; }
+  .quest-item{ display:flex; align-items:center; gap:8px; padding:6px 0; font-size:0.78em; }
+  .quest-item.done{ color:var(--green); }
+  .quest-check{ width:18px; height:18px; border-radius:50%; border:2px solid var(--line); flex:none;
+    display:flex; align-items:center; justify-content:center; font-size:0.7em; }
+  .quest-item.done .quest-check{ border-color:var(--green); background:var(--green); color:#0e1526; }
+  .quest-track{ flex:1; }
+  .quest-bar{ height:5px; background:#0e1526; border-radius:4px; overflow:hidden; margin-top:3px; }
+  .quest-bar-fill{ height:100%; background:var(--blue); }
+  .quest-reward{ font-size:0.7em; color:var(--ink-dim); white-space:nowrap; }
+
+  /* Stats */
+  .stats-row{ display:flex; gap:8px; margin-top:12px; }
+  .stat-box{ flex:1; background:var(--bg-panel); border:1px solid var(--line); border-radius:14px; padding:9px; text-align:center; }
+  .stat-box .val{ font-weight:800; font-size:0.95em; }
+  .stat-box .lbl{ font-size:0.65em; color:var(--ink-dim); margin-top:2px; }
+
+  /* Encounter / capture panel */
+  .stage{ margin-top:16px; background:var(--bg-panel); border:1px solid var(--line); border-radius:18px;
+    padding:18px; text-align:center; min-height:120px; }
+  .stage .hint{ color:var(--ink-dim); font-size:0.9em; }
+  .pokedex-num{ font-size:0.72em; color:var(--ink-dim); font-weight:700; letter-spacing:1px; }
+  .poke-name{ margin:4px 0 8px; font-size:1.15em; font-weight:800; letter-spacing:0.3px; }
+  .poke-name.legendary{ background:linear-gradient(90deg,#ffcd3c,#ff9d4d,#ffcd3c);
+    -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .poke-img-wrap{ position:relative; display:inline-block; }
+  img.pokemon-img{ width:150px; height:150px; object-fit:contain; filter:drop-shadow(0 10px 14px rgba(0,0,0,0.4)); }
+  .legend-ring{ position:absolute; inset:0; margin:auto; width:170px; height:170px;
+    border-radius:50%; border:2px dashed var(--gold); animation:spin 8s linear infinite; opacity:0.7; }
+  @keyframes spin{ to{ transform:rotate(360deg);} }
+  .types-row{ display:flex; gap:6px; justify-content:center; margin-top:6px; flex-wrap:wrap; }
+  .type-chip{ font-size:0.68em; font-weight:700; color:#fff; padding:3px 9px; border-radius:999px; text-shadow:0 1px 1px rgba(0,0,0,0.25); }
+  .flavor-text{ font-style:italic; color:var(--ink-dim); font-size:0.82em; margin-top:10px; line-height:1.4; }
+
+  .egg-wrap{ margin:6px 0; }
+  .egg-emoji{ font-size:3.2em; display:inline-block; animation:eggbounce 1.4s ease-in-out infinite; }
+  @keyframes eggbounce{ 0%,100%{ transform:translateY(0) rotate(-3deg);} 50%{ transform:translateY(-8px) rotate(3deg);} }
+
+  .catch-zone{ margin-top:14px; }
+  .catch-rate{ font-size:0.72em; color:var(--ink-dim); margin-bottom:8px; }
+  .bar-outer{ position:relative; height:26px; background:#0e1526; border-radius:13px; border:1px solid var(--line); overflow:hidden; }
+  .bar-sweet{ position:absolute; top:0; bottom:0; background:rgba(79,216,138,0.35); border-left:2px solid var(--green); border-right:2px solid var(--green); }
+  .bar-needle{ position:absolute; top:0; bottom:0; width:4px; background:var(--red); border-radius:2px; box-shadow:0 0 8px var(--red); }
+
+  .btn-row{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+  button{ font-family:'Poppins', sans-serif; font-weight:700; border:none; border-radius:12px; padding:11px 14px;
+    cursor:pointer; font-size:0.85em; flex:1; transition:transform .12s ease, filter .12s ease; }
+  button:active{ transform:scale(0.96); }
+  button.primary{ background:linear-gradient(180deg,var(--red),var(--red-dark)); color:#fff; box-shadow:0 6px 14px rgba(239,77,94,0.35); }
+  button.secondary{ background:var(--bg-card); color:var(--ink-dim); border:1px solid var(--line); flex:0 0 auto; padding:11px 16px; }
+  button.gold-btn{ background:linear-gradient(180deg,var(--gold),#e0a80f); color:#2a1d00; flex:0 0 auto; padding:11px 16px; }
+  button:disabled{ opacity:0.45; cursor:not-allowed; filter:grayscale(0.3); }
+
+  .toast{ position:fixed; left:50%; top:14px; transform:translate(-50%,-140%); z-index:50;
+    background:var(--bg-card); border:1px solid var(--line); color:var(--ink); padding:10px 16px;
+    border-radius:14px; font-size:0.82em; font-weight:600; box-shadow:0 10px 24px rgba(0,0,0,0.4);
+    transition:transform .35s ease; display:flex; gap:8px; align-items:center; max-width:90vw; }
+  .toast.show{ transform:translate(-50%,0); }
+  .toast.gold{ border-color:var(--gold); }
+  .toast.green{ border-color:var(--green); }
+
+  /* Pokedex grid */
+  .pokedex-container{ margin-top:20px; border-top:1px dashed var(--line); padding-top:14px; }
+  .pokedex-container h3{ font-size:0.85em; display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+  .count-badge{ background:var(--green); color:#0e1526; padding:2px 9px; border-radius:12px; font-size:0.85em; font-weight:800; }
+  .pokedex-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(76px,1fr)); gap:8px;
+    max-height:260px; overflow-y:auto; padding:10px; background:var(--bg-panel); border-radius:14px; border:1px solid var(--line); }
+  .pokedex-item{ background:var(--bg-card); border-radius:10px; padding:6px; font-size:0.72em; cursor:pointer;
+    border:1px solid var(--line); text-align:center; transition:transform .1s ease; }
+  .pokedex-item:hover{ transform:translateY(-2px); border-color:var(--red); }
+  .pokedex-item.legendary{ border-color:var(--gold); box-shadow:0 0 10px rgba(255,205,60,0.25); }
+  .pokedex-item img{ width:48px; height:48px; }
+  .pokedex-item strong{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pokedex-empty{ grid-column:1/-1; color:var(--ink-dim); text-align:center; font-size:0.82em; padding:10px 0; }
+
+  ::-webkit-scrollbar{ width:8px; }
+  ::-webkit-scrollbar-thumb{ background:var(--line); border-radius:8px; }
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<div class="card">
+
+  <header class="top">
+    <div class="brand">
+      <svg class="ball-logo" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="46" fill="#fff" stroke="#141a29" stroke-width="4"/>
+        <path d="M4 50a46 46 0 0 1 92 0Z" fill="#ef4d5e" stroke="#141a29" stroke-width="4"/>
+        <rect x="4" y="46" width="92" height="8" fill="#141a29"/>
+        <circle cx="50" cy="50" r="14" fill="#fff" stroke="#141a29" stroke-width="5"/>
+      </svg>
+      <div>
+        <h1 class="pixel">POKÉMON GPS GO</h1>
+        <div class="sub">Explorez. Marchez. Attrapez-les tous.</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="meta-row">
+    <div class="chip" id="streak-chip">🔥 <span id="streak-count">0</span> j.</div>
+    <div class="chip" id="candy-chip">🍬 <span id="candy-count">0</span></div>
+    <div class="chip" id="ball-counter">
+      <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="#fff" stroke="#141a29" stroke-width="6"/><path d="M4 50a46 46 0 0 1 92 0Z" fill="#ef4d5e" stroke="#141a29" stroke-width="6"/><rect x="4" y="46" width="92" height="8" fill="#141a29"/><circle cx="50" cy="50" r="12" fill="#fff" stroke="#141a29" stroke-width="6"/></svg>
+      <span id="ball-count">5</span>
+    </div>
+  </div>
+
+  <div class="trainer-row">
+    <div class="labels">
+      <span id="trainer-level">Dresseur Niv. 1</span>
+      <span id="xp-label">0 / 100 XP</span>
+    </div>
+    <div class="xp-track"><div class="xp-fill" id="xp-fill"></div></div>
+  </div>
+
+  <div class="radar-wrap">
+    <div class="radar">
+      <svg width="76" height="76">
+        <circle cx="38" cy="38" r="32" fill="none" stroke="#374266" stroke-width="7"/>
+        <circle id="radar-progress" cx="38" cy="38" r="32" fill="none" stroke="#4fd88a" stroke-width="7"
+                stroke-linecap="round" stroke-dasharray="201" stroke-dashoffset="201"/>
+      </svg>
+      <div class="center"><span>🧭</span></div>
+    </div>
+    <div class="radar-text">
+      <div class="km-big"><span id="km">0.000</span><span class="km-unit"> km</span></div>
+      <div class="target-line">Prochaine rencontre à <b><span id="target-km">--</span> km</b></div>
+    </div>
+  </div>
+
+  <p id="status">En attente du signal GPS...</p>
+  <button class="test-btn" id="test-btn" type="button">🧪 Mode test — simuler 250 m</button>
+
+  <div class="quests" id="quests-panel">
+    <h3>🎯 Défis du jour</h3>
+    <div id="quests-list"></div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-box"><div class="val" id="stat-today">0.00 km</div><div class="lbl">Aujourd'hui</div></div>
+    <div class="stat-box"><div class="val" id="stat-month">0.00 km</div><div class="lbl">Ce mois-ci</div></div>
+    <div class="stat-box"><div class="val" id="stat-record">0.00 km</div><div class="lbl">Record</div></div>
+  </div>
+
+  <div class="stage" id="pokemon-area">
+    <p class="hint">Marchez pour commencer la recherche !</p>
+  </div>
+
+  <div class="pokedex-container">
+    <h3><span class="pixel" style="font-size:0.9em;">POKÉDEX</span> <span id="caught-count" class="count-badge">0</span><span style="color:var(--ink-dim); font-weight:600;">/ 1025</span></h3>
+    <div class="pokedex-grid" id="pokedex-list"></div>
+  </div>
+
+</div>
+
+<canvas id="share-canvas" width="600" height="750" style="display:none;"></canvas>
+
+<script>
+/* =========================================================
+   ÉTAT DU JEU
+========================================================= */
+let totalDistance = 0;
+let lastPosition = null;   // {lat, lon, t}
+let nextTarget = generateRandomDistance();
+let distSinceLastEncounter = 0;
+
+let pokedex   = JSON.parse(localStorage.getItem('myPokedex'))   || {};
+let apiCache  = JSON.parse(localStorage.getItem('pokeApiCache'))|| {};
+let trainer   = JSON.parse(localStorage.getItem('trainerState'))|| { xp:0, level:1, candies:0, balls:5, dailyKm:{}, streak:{count:0,lastDate:null}, quests:null };
+trainer.dailyKm = trainer.dailyKm || {};
+trainer.streak = trainer.streak || {count:0,lastDate:null};
+
+let currentEncounter = null; // pokemon en cours de capture
+let currentEgg = null;       // {mon, distanceNeeded, distanceWalked}
+let captureTimer = null;
+let needlePos = 0, needleDir = 1;
+
+const RADAR_CIRC = 201;
+
+const LEGENDARY_IDS = new Set([
+  144,145,146,150,151,
+  243,244,245,249,250,251,
+  377,378,379,380,381,382,383,384,385,386,
+  480,481,482,483,484,485,486,487,488,489,490,491,492,493,
+  494,638,639,640,641,642,643,644,645,646,647,648,649,
+  716,717,718,719,720,721,
+  772,773,785,786,787,788,789,790,791,792,793,794,795,796,797,798,799,800,801,802,807,808,809,
+  888,889,890,891,892,893,894,895,896,897,898,
+  1001,1002,1003,1004,1007,1008,1009,1010
+]);
+
+const TYPE_INFO = {
+  normal:{fr:'Normal',color:'#A8A77A'}, fire:{fr:'Feu',color:'#EE8130'},
+  water:{fr:'Eau',color:'#6390F0'}, electric:{fr:'Électrik',color:'#E8C93B'},
+  grass:{fr:'Plante',color:'#7AC74C'}, ice:{fr:'Glace',color:'#79D2CF'},
+  fighting:{fr:'Combat',color:'#C22E28'}, poison:{fr:'Poison',color:'#A33EA1'},
+  ground:{fr:'Sol',color:'#D8B662'}, flying:{fr:'Vol',color:'#A98FF3'},
+  psychic:{fr:'Psy',color:'#F95587'}, bug:{fr:'Insecte',color:'#A6B91A'},
+  rock:{fr:'Roche',color:'#B6A136'}, ghost:{fr:'Spectre',color:'#735797'},
+  dragon:{fr:'Dragon',color:'#6F35FC'}, dark:{fr:'Ténèbres',color:'#705746'},
+  steel:{fr:'Acier',color:'#B7B7CE'}, fairy:{fr:'Fée',color:'#D685AD'}
+};
+
+/* =========================================================
+   INITIALISATION UI
+========================================================= */
+document.getElementById('target-km').innerText = nextTarget.toFixed(1);
+ensureDailyQuests();
+updateStreak();
+renderPokedex();
+renderTrainer();
+renderBalls();
+renderCandies();
+renderStreak();
+renderQuests();
+renderStats();
+
+document.getElementById('test-btn').addEventListener('click', () => processDistance(0.25, true));
+
+/* =========================================================
+   UTILITAIRES
+========================================================= */
+function saveAll(){
+  localStorage.setItem('myPokedex', JSON.stringify(pokedex));
+  localStorage.setItem('pokeApiCache', JSON.stringify(apiCache));
+  localStorage.setItem('trainerState', JSON.stringify(trainer));
+}
+
+function generateRandomDistance(){
+  return parseFloat((Math.random() * (5.0 - 0.5) + 0.5).toFixed(1));
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2){
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+}
+
+function showToast(msg, kind){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (kind ? ' ' + kind : '');
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(() => { t.className = 'toast'; }, 2600);
+}
+
+function vibrate(pattern){ if (navigator.vibrate) navigator.vibrate(pattern); }
+
+let audioCtx = null;
+function beep(freq, duration, type, gain){
+  freq = freq || 440; duration = duration || 0.12; type = type || 'sine'; gain = gain || 0.05;
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = type; osc.frequency.value = freq;
+    g.gain.value = gain;
+    osc.connect(g); g.connect(audioCtx.destination);
+    osc.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+    osc.stop(audioCtx.currentTime + duration);
+  }catch(e){ /* audio indisponible */ }
+}
+function soundEncounter(){ beep(660,0.1); setTimeout(()=>beep(880,0.12),110); }
+function soundSuccess(){ beep(523,0.1); setTimeout(()=>beep(659,0.1),100); setTimeout(()=>beep(784,0.18),200); }
+function soundFail(){ beep(220,0.25,'sawtooth',0.04); }
+function soundLevelUp(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,0.15),i*90)); }
+function soundEgg(){ beep(440,0.15); }
+function soundHatch(){ beep(784,0.12); setTimeout(()=>beep(988,0.15),120); }
+
+/* =========================================================
+   DRESSEUR / XP
+========================================================= */
+function xpForLevel(lvl){ return lvl * 100; }
+
+function addXP(amount){
+  trainer.xp += amount;
+  let needed = xpForLevel(trainer.level);
+  while (trainer.xp >= needed){
+    trainer.xp -= needed;
+    trainer.level += 1;
+    needed = xpForLevel(trainer.level);
+    soundLevelUp();
+    showToast('🎉 Niveau ' + trainer.level + ' atteint !', 'gold');
+  }
+  renderTrainer();
+  saveAll();
+}
+
+function renderTrainer(){
+  document.getElementById('trainer-level').innerText = 'Dresseur Niv. ' + trainer.level;
+  const needed = xpForLevel(trainer.level);
+  document.getElementById('xp-label').innerText = Math.floor(trainer.xp) + ' / ' + needed + ' XP';
+  document.getElementById('xp-fill').style.width = Math.min(100, (trainer.xp/needed)*100) + '%';
+}
+
+function renderCandies(){ document.getElementById('candy-count').innerText = trainer.candies || 0; }
+function renderBalls(){ document.getElementById('ball-count').innerText = trainer.balls; }
+
+/* =========================================================
+   STREAK
+========================================================= */
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function yesterdayStr(){ return new Date(Date.now() - 86400000).toISOString().slice(0,10); }
+
+function updateStreak(){
+  const t = todayStr();
+  if (trainer.streak.lastDate === t) return;
+  if (trainer.streak.lastDate === yesterdayStr()){ trainer.streak.count += 1; }
+  else { trainer.streak.count = 1; }
+  trainer.streak.lastDate = t;
+  saveAll();
+}
+function renderStreak(){ document.getElementById('streak-count').innerText = trainer.streak.count; }
+
+/* =========================================================
+   STATS (aujourd'hui / mois / record)
+========================================================= */
+function updateDailyStats(dist){
+  const d = todayStr();
+  trainer.dailyKm[d] = (trainer.dailyKm[d] || 0) + dist;
+  saveAll();
+  renderStats();
+}
+
+function renderStats(){
+  const d = todayStr();
+  const month = d.slice(0,7);
+  const today = trainer.dailyKm[d] || 0;
+  let monthTotal = 0, record = 0;
+  Object.keys(trainer.dailyKm).forEach(key => {
+    const val = trainer.dailyKm[key];
+    if (key.slice(0,7) === month) monthTotal += val;
+    if (val > record) record = val;
+  });
+  document.getElementById('stat-today').innerText = today.toFixed(2) + ' km';
+  document.getElementById('stat-month').innerText = monthTotal.toFixed(2) + ' km';
+  document.getElementById('stat-record').innerText = record.toFixed(2) + ' km';
+}
+
+/* =========================================================
+   QUÊTES QUOTIDIENNES
+========================================================= */
+function randomType(){
+  const keys = Object.keys(TYPE_INFO);
+  return keys[Math.floor(Math.random() * keys.length)];
+}
+
+function generateQuests(){
+  const walkTarget = [1,2,3][Math.floor(Math.random()*3)];
+  const catchTarget = [1,2][Math.floor(Math.random()*2)];
+  const typeTarget = randomType();
+  return [
+    { id:'walk', type:'walk_km', target:walkTarget, progress:0, done:false, reward:{xp:30,balls:1} },
+    { id:'catch', type:'catch_n', target:catchTarget, progress:0, done:false, reward:{xp:40,balls:2} },
+    { id:'type', type:'catch_type', typeTarget:typeTarget, target:1, progress:0, done:false, reward:{xp:35,balls:1} }
+  ];
+}
+
+function ensureDailyQuests(){
+  const t = todayStr();
+  if (!trainer.quests || trainer.quests.date !== t){
+    trainer.quests = { date:t, list: generateQuests() };
+    saveAll();
+  }
+}
+
+function completeQuest(q){
+  q.done = true;
+  trainer.balls = Math.min(10, trainer.balls + (q.reward.balls || 0));
+  showToast('🏆 Défi complété : +' + (q.reward.xp||0) + ' XP' + (q.reward.balls ? ' +' + q.reward.balls + ' Balls' : ''), 'green');
+  renderBalls();
+  addXP(q.reward.xp || 0);
+}
+
+function updateQuestsOnWalk(dist){
+  ensureDailyQuests();
+  let changed = false;
+  trainer.quests.list.forEach(q => {
+    if (q.done || q.type !== 'walk_km') return;
+    q.progress += dist;
+    changed = true;
+    if (q.progress >= q.target) completeQuest(q);
+  });
+  if (changed){ saveAll(); renderQuests(); }
+}
+
+function updateQuestsOnCatch(mon){
+  ensureDailyQuests();
+  let changed = false;
+  trainer.quests.list.forEach(q => {
+    if (q.done) return;
+    if (q.type === 'catch_n'){ q.progress += 1; changed = true; if (q.progress >= q.target) completeQuest(q); }
+    if (q.type === 'catch_type' && mon.types.includes(q.typeTarget)){ q.progress = 1; changed = true; completeQuest(q); }
+  });
+  if (changed){ saveAll(); renderQuests(); }
+}
+
+function questLabel(q){
+  if (q.type === 'walk_km') return 'Marcher ' + q.target + ' km';
+  if (q.type === 'catch_n') return 'Capturer ' + q.target + ' Pokémon';
+  if (q.type === 'catch_type'){
+    const info = TYPE_INFO[q.typeTarget] || {fr:q.typeTarget};
+    return 'Capturer un Pokémon de type ' + info.fr;
+  }
+  return '';
+}
+
+function renderQuests(){
+  ensureDailyQuests();
+  const list = trainer.quests.list;
+  document.getElementById('quests-list').innerHTML = list.map(q => {
+    const pct = Math.min(100, (q.progress / q.target) * 100);
+    return `
+      <div class="quest-item ${q.done ? 'done' : ''}">
+        <div class="quest-check">${q.done ? '✓' : ''}</div>
+        <div class="quest-track">
+          <div>${questLabel(q)}</div>
+          <div class="quest-bar"><div class="quest-bar-fill" style="width:${pct}%"></div></div>
+        </div>
+        <div class="quest-reward">+${q.reward.xp}xp${q.reward.balls ? ' +'+q.reward.balls+'⚪' : ''}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* =========================================================
+   POKÉ BALLS
+========================================================= */
+function grantBallsForDistance(distanceWalkedKm){
+  trainer._ballProgress = (trainer._ballProgress || 0) + distanceWalkedKm;
+  while (trainer._ballProgress >= 1 && trainer.balls < 10){
+    trainer._ballProgress -= 1;
+    trainer.balls += 1;
+    showToast('🔴 Nouvelle Poké Ball obtenue !');
+  }
+  renderBalls();
+  saveAll();
+}
+
+/* =========================================================
+   API POKEMON (avec cache)
+========================================================= */
+async function fetchPokemonData(pokemonId){
+  if (apiCache[pokemonId]) return apiCache[pokemonId];
+
+  const responseData = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`);
+  const data = await responseData.json();
+  const responseSpecies = await fetch(`https://pokeapi.co/api/v2/pokemon-species/${pokemonId}`);
+  const speciesData = await responseSpecies.json();
+
+  const frenchNameObj = speciesData.names.find(n => n.language.name === "fr");
+  const frenchName = frenchNameObj ? frenchNameObj.name : data.name;
+
+  const frenchFlavorObj = speciesData.flavor_text_entries.find(f => f.language.name === "fr");
+  let frenchFlavor = frenchFlavorObj ? frenchFlavorObj.flavor_text : "Aucune description disponible.";
+  frenchFlavor = frenchFlavor.replace(/[\r\n\x0B\x0C\u0085\u2028\u2029]/g, " ");
+
+  const record = {
+    id: pokemonId,
+    name: frenchName,
+    image: data.sprites.other['official-artwork'].front_default || data.sprites.front_default,
+    thumb: data.sprites.front_default,
+    description: frenchFlavor,
+    types: data.types.map(t => t.type.name),
+    captureRate: speciesData.capture_rate,
+    evolutionChainUrl: speciesData.evolution_chain ? speciesData.evolution_chain.url : null,
+    speciesName: speciesData.name,
+    isLegendary: speciesData.is_legendary || speciesData.is_mythical || LEGENDARY_IDS.has(pokemonId)
+  };
+  apiCache[pokemonId] = record;
+  saveAll();
+  return record;
+}
+
+function pickWeightedPokemonId(){
+  if (Math.random() < 0.04){
+    const arr = Array.from(LEGENDARY_IDS);
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+  let id;
+  do { id = Math.floor(Math.random() * 1025) + 1; } while (LEGENDARY_IDS.has(id));
+  return id;
+}
+
+async function pickAndFetchBiasedMon(){
+  const hour = new Date().getHours();
+  const isNight = hour < 6 || hour >= 20;
+  const preferred = isNight
+    ? ['dark','ghost','poison','psychic']
+    : ['normal','flying','bug','fire','grass','water'];
+  let mon = null;
+  for (let attempt = 0; attempt < 3; attempt++){
+    const id = pickWeightedPokemonId();
+    const candidate = await fetchPokemonData(id);
+    const matches = candidate.types.some(t => preferred.includes(t));
+    if (matches || attempt === 2){ mon = candidate; break; }
+  }
+  return mon;
+}
+
+/* =========================================================
+   ŒUFS
+========================================================= */
+function computeHatchDistance(mon){
+  let base = 0.3 + Math.random() * 0.9;
+  if (mon.isLegendary) base += 1.5 + Math.random() * 1.0;
+  return parseFloat(base.toFixed(2));
+}
+
+async function spawnEgg(){
+  document.getElementById('pokemon-area').innerHTML = '<p class="hint">Vous sentez une présence... un Œuf est apparu !</p>';
+  try{
+    const mon = await pickAndFetchBiasedMon();
+    const distanceNeeded = computeHatchDistance(mon);
+    currentEgg = { mon, distanceNeeded, distanceWalked: 0 };
+    soundEgg(); vibrate(60);
+    renderEggUI();
+  }catch(err){
+    document.getElementById('pokemon-area').innerHTML = `
+      <p class="hint">Connexion impossible pour faire apparaître l'Œuf.</p>
+      <button class="secondary" id="retry-egg-btn" style="margin-top:10px;">Réessayer</button>
+    `;
+    document.getElementById('retry-egg-btn')?.addEventListener('click', spawnEgg);
+  }
+}
+
+function renderEggUI(){
+  if (!currentEgg) return;
+  const pct = Math.min(100, (currentEgg.distanceWalked / currentEgg.distanceNeeded) * 100);
+  document.getElementById('pokemon-area').innerHTML = `
+    <p class="hint">Un Œuf a été déposé sur votre chemin</p>
+    <div class="egg-wrap"><span class="egg-emoji">🥚</span></div>
+    <div class="bar-outer">
+      <div class="bar-sweet" style="left:0; width:${pct}%; background:rgba(79,216,138,0.5); border:none;"></div>
+    </div>
+    <p class="hint" style="margin-top:8px; font-size:0.78em;">${currentEgg.distanceWalked.toFixed(2)} / ${currentEgg.distanceNeeded} km pour éclore</p>
+  `;
+}
+
+function hatchEgg(){
+  const mon = currentEgg.mon;
+  currentEgg = null;
+  soundHatch();
+  vibrate([50,50,50,50,150]);
+  currentEncounter = mon;
+  renderEncounter(mon, true);
+}
+
+/* =========================================================
+   RENCONTRE / CAPTURE
+========================================================= */
+function renderEncounter(mon, isWild){
+  const already = !!pokedex[mon.id];
+  const typesHtml = mon.types.map(t => {
+    const info = TYPE_INFO[t] || {fr:t, color:'#777'};
+    return `<span class="type-chip" style="background:${info.color}">${info.fr}</span>`;
+  }).join('');
+
+  document.getElementById('pokemon-area').innerHTML = `
+    <p class="pokedex-num">N°${String(mon.id).padStart(4,'0')} ${already ? '· déjà capturé' : ''}</p>
+    <h2 class="poke-name ${mon.isLegendary ? 'legendary' : ''}">${mon.name.toUpperCase()}</h2>
+    <div class="poke-img-wrap">
+      ${mon.isLegendary ? '<div class="legend-ring"></div>' : ''}
+      <img class="pokemon-img" src="${mon.image}" alt="${mon.name}">
+    </div>
+    <div class="types-row">${typesHtml}</div>
+    <p class="flavor-text">"${mon.description}"</p>
+    <div id="action-slot"></div>
+  `;
+
+  if (isWild){
+    document.getElementById('action-slot').innerHTML = renderCaptureUI(mon);
+    startNeedleAnimation(mon);
+  } else if (already){
+    document.getElementById('action-slot').innerHTML = renderOwnedActionsUI();
+    document.getElementById('share-btn')?.addEventListener('click', () => shareCapture(mon));
+    document.getElementById('evolve-btn')?.addEventListener('click', () => tryEvolve(mon));
+  }
+}
+
+function renderCaptureUI(mon){
+  const sweetWidth = mon.isLegendary ? 14 : 30;
+  const rate = mon.captureRate != null ? Math.round((mon.captureRate/255)*100) : 50;
+  return `
+    <div class="catch-zone">
+      <div class="catch-rate">Taux de capture estimé : ${rate}%${mon.isLegendary ? ' · Pokémon légendaire !' : ''}</div>
+      <div class="bar-outer">
+        <div class="bar-sweet" id="bar-sweet" style="left:${50 - sweetWidth/2}%; width:${sweetWidth}%;"></div>
+        <div class="bar-needle" id="bar-needle" style="left:0%;"></div>
+      </div>
+      <div class="btn-row">
+        <button class="primary" id="throw-btn" ${trainer.balls<=0 ? 'disabled':''}>🔴 Lancer la Poké Ball (${trainer.balls})</button>
+        <button class="secondary" id="flee-btn">Laisser partir</button>
+      </div>
+      ${trainer.balls<=0 ? '<p class="hint" style="margin-top:8px;">Plus de Poké Balls ! Marchez pour en retrouver.</p>' : ''}
+    </div>
+  `;
+}
+
+function renderOwnedActionsUI(){
+  return `
+    <div class="btn-row">
+      <button class="gold-btn" id="evolve-btn">🍬 Évoluer (${trainer.candies||0} bonbons)</button>
+      <button class="secondary" id="share-btn">📤 Partager</button>
+    </div>
+  `;
+}
+
+function startNeedleAnimation(mon){
+  cancelAnimationFrame(captureTimer);
+  needlePos = 0; needleDir = 1;
+  const speed = mon.isLegendary ? 2.6 : 1.8;
+
+  function step(){
+    const needle = document.getElementById('bar-needle');
+    if (!needle) return;
+    needlePos += needleDir * speed;
+    if (needlePos >= 100){ needlePos = 100; needleDir = -1; }
+    if (needlePos <= 0){ needlePos = 0; needleDir = 1; }
+    needle.style.left = needlePos + '%';
+    captureTimer = requestAnimationFrame(step);
+  }
+  captureTimer = requestAnimationFrame(step);
+
+  document.getElementById('throw-btn')?.addEventListener('click', () => attemptCapture(mon));
+  document.getElementById('flee-btn')?.addEventListener('click', () => endEncounter(mon));
+}
+
+function attemptCapture(mon){
+  if (trainer.balls <= 0) return;
+  cancelAnimationFrame(captureTimer);
+
+  const sweetWidth = mon.isLegendary ? 14 : 30;
+  const sweetStart = 50 - sweetWidth/2;
+  const sweetEnd = 50 + sweetWidth/2;
+  const distFromCenter = Math.abs(needlePos - 50);
+  const inZone = needlePos >= sweetStart && needlePos <= sweetEnd;
+  const precision = Math.max(0, 1 - distFromCenter/50);
+
+  trainer.balls -= 1;
+  renderBalls();
+
+  const baseChance = mon.captureRate != null ? mon.captureRate/255 : 0.5;
+  let chance = baseChance * (0.35 + 0.65*precision);
+  if (inZone) chance = Math.min(1, chance * 1.4);
+  if (mon.isLegendary) chance *= 0.7;
+
+  const success = Math.random() < chance;
+  vibrate(success ? [60,40,60,40,120] : [200]);
+
+  if (success){
+    soundSuccess();
+    const isNew = !pokedex[mon.id];
+    if (isNew){
+      pokedex[mon.id] = { ...mon, date: new Date().toLocaleDateString('fr-FR') };
+      renderPokedex();
+      addXP(mon.isLegendary ? 150 : 40);
+      showToast('✅ ' + mon.name + ' capturé et ajouté au Pokédex !', mon.isLegendary ? 'gold' : 'green');
+    } else {
+      trainer.candies = (trainer.candies || 0) + 1;
+      renderCandies();
+      addXP(mon.isLegendary ? 30 : 10);
+      showToast('🍬 Doublon ! ' + mon.name + ' converti en bonbon (+1).', 'green');
+    }
+    updateQuestsOnCatch(mon);
+    saveAll();
+    currentEncounter = null;
+    renderEncounter(mon, false);
+  } else {
+    soundFail();
+    showToast('💨 ' + mon.name + " s'est échappé !");
+    if (trainer.balls > 0){
+      renderEncounter(mon, true);
+    } else {
+      currentEncounter = null;
+      document.getElementById('pokemon-area').innerHTML = '<p class="hint">Le Pokémon a fui. Continuez à marcher !</p>';
+    }
+  }
+}
+
+function endEncounter(mon){
+  cancelAnimationFrame(captureTimer);
+  currentEncounter = null;
+  document.getElementById('pokemon-area').innerHTML = '<p class="hint">Vous laissez ' + mon.name + ' repartir. Continuez à marcher !</p>';
+}
+
+/* =========================================================
+   ÉVOLUTIONS
+========================================================= */
+function findNextEvolution(node, speciesName){
+  if (node.species.name === speciesName){
+    if (node.evolves_to && node.evolves_to.length > 0){
+      const next = node.evolves_to[0];
+      const id = parseInt(next.species.url.split('/').filter(Boolean).pop());
+      return { id, name: next.species.name };
+    }
+    return null;
+  }
+  for (const child of node.evolves_to || []){
+    const res = findNextEvolution(child, speciesName);
+    if (res) return res;
+  }
+  return null;
+}
+
+async function getEvolutionTarget(mon){
+  if (mon._evoChecked) return mon._evoTarget || null;
+  if (!mon.evolutionChainUrl) return null;
+  try{
+    const chainRes = await fetch(mon.evolutionChainUrl);
+    const chain = await chainRes.json();
+    const target = findNextEvolution(chain.chain, mon.speciesName || mon.name);
+    mon._evoChecked = true;
+    mon._evoTarget = target;
+    if (pokedex[mon.id]) pokedex[mon.id]._evoChecked = true, pokedex[mon.id]._evoTarget = target;
+    if (apiCache[mon.id]){ apiCache[mon.id]._evoChecked = true; apiCache[mon.id]._evoTarget = target; }
+    saveAll();
+    return target;
+  }catch(e){
+    showToast("Impossible de vérifier l'évolution pour le moment.");
+    return null;
+  }
+}
+
+async function tryEvolve(mon){
+  const target = await getEvolutionTarget(mon);
+  if (!target){ showToast('Ce Pokémon ne peut pas évoluer davantage.'); return; }
+  const COST = 25;
+  if ((trainer.candies||0) < COST){ showToast('Pas assez de bonbons (' + (trainer.candies||0) + '/' + COST + ').'); return; }
+
+  trainer.candies -= COST;
+  renderCandies();
+  try{
+    const evolvedMon = await fetchPokemonData(target.id);
+    const wasNew = !pokedex[evolvedMon.id];
+    pokedex[evolvedMon.id] = { ...evolvedMon, date: new Date().toLocaleDateString('fr-FR') };
+    saveAll();
+    renderPokedex();
+    addXP(60);
+    soundSuccess(); vibrate([60,40,60,40,120]);
+    showToast('✨ ' + mon.name + ' a évolué en ' + evolvedMon.name + ' !', 'gold');
+    renderEncounter(evolvedMon, false);
+  }catch(e){
+    trainer.candies += COST; renderCandies(); saveAll();
+    showToast("Erreur réseau, l'évolution a échoué. Bonbons remboursés.");
+  }
+}
+
+/* =========================================================
+   PARTAGE (image générée)
+========================================================= */
+function wrapText(ctx, text, x, y, maxWidth, lineHeight){
+  const words = text.split(' ');
+  let line = '', curY = y;
+  for (const w of words){
+    const test = line + w + ' ';
+    if (ctx.measureText(test).width > maxWidth && line){
+      ctx.fillText(line, x, curY); line = w + ' '; curY += lineHeight;
+    } else line = test;
+  }
+  ctx.fillText(line, x, curY);
+  return curY;
+}
+
+function shareCapture(mon){
+  const canvas = document.getElementById('share-canvas');
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createLinearGradient(0,0,0,750);
+  grad.addColorStop(0,'#1f2740'); grad.addColorStop(1,'#141a29');
+  ctx.fillStyle = grad; ctx.fillRect(0,0,600,750);
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#eef1fb'; ctx.font = 'bold 30px sans-serif';
+  ctx.fillText('POKÉMON GPS GO', 300, 55);
+  ctx.fillStyle = mon.isLegendary ? '#ffcd3c' : '#ef4d5e';
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillText(mon.isLegendary ? 'CAPTURE LÉGENDAIRE !' : 'Nouvelle capture !', 300, 90);
+
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    try{
+      ctx.drawImage(img, 175, 120, 250, 250);
+      ctx.fillStyle = '#eef1fb'; ctx.font = 'bold 36px sans-serif';
+      ctx.fillText(mon.name.toUpperCase(), 300, 410);
+      ctx.font = '16px sans-serif'; ctx.fillStyle = '#8b93b8';
+      wrapText(ctx, mon.description, 300, 450, 480, 22);
+      ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = '#4fd88a';
+      ctx.fillText('Dresseur Niv. ' + trainer.level + ' · ' + Object.keys(pokedex).length + ' Pokémon capturés', 300, 700);
+      const link = document.createElement('a');
+      link.download = 'capture-' + mon.name.toLowerCase() + '.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }catch(e){
+      showToast("Impossible de générer l'image (restriction du navigateur).");
+    }
+  };
+  img.onerror = () => showToast("Impossible de charger l'image pour le partage.");
+  img.src = mon.image;
+}
+
+/* =========================================================
+   POKÉDEX (grille)
+========================================================= */
+function renderPokedex(){
+  const list = document.getElementById('pokedex-list');
+  const keys = Object.keys(pokedex);
+  document.getElementById('caught-count').innerText = keys.length;
+
+  if (keys.length === 0){
+    list.innerHTML = '<div class="pokedex-empty">Aucun Pokémon capturé pour le moment.</div>';
+    return;
+  }
+
+  keys.sort((a,b) => a - b);
+  list.innerHTML = keys.map(id => {
+    const p = pokedex[id];
+    return `
+      <div class="pokedex-item ${p.isLegendary ? 'legendary':''}" onclick="viewCaughtPokemon(${p.id})">
+        <img src="${p.thumb}" alt="${p.name}">
+        <strong>${p.name}</strong>
+        <span style="color:var(--ink-dim);">N°${String(p.id).padStart(4,'0')}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+async function viewCaughtPokemon(id){
+  try{
+    const mon = await fetchPokemonData(id);
+    currentEncounter = null;
+    renderEncounter(mon, false);
+    window.scrollTo({top:0, behavior:'smooth'});
+  }catch(e){
+    showToast('Connexion impossible pour charger ce Pokémon.');
+  }
+}
+
+/* =========================================================
+   RADAR
+========================================================= */
+function updateRadar(dist){
+  const ratio = Math.min(1, dist / nextTarget);
+  const offset = RADAR_CIRC * (1 - ratio);
+  document.getElementById('radar-progress').style.strokeDashoffset = offset;
+}
+
+/* =========================================================
+   TRAITEMENT UNIFIÉ DE LA DISTANCE (GPS réel + mode test)
+========================================================= */
+function processDistance(dist, isTest){
+  totalDistance += dist;
+  document.getElementById('km').innerText = totalDistance.toFixed(3);
+  grantBallsForDistance(dist);
+  updateDailyStats(dist);
+  updateQuestsOnWalk(dist);
+
+  if (currentEgg){
+    currentEgg.distanceWalked += dist;
+    if (currentEgg.distanceWalked >= currentEgg.distanceNeeded){
+      hatchEgg();
+    } else {
+      renderEggUI();
+    }
+  } else if (!currentEncounter){
+    distSinceLastEncounter += dist;
+    updateRadar(distSinceLastEncounter);
+    if (distSinceLastEncounter >= nextTarget){
+      distSinceLastEncounter = 0;
+      spawnEgg();
+      nextTarget = generateRandomDistance();
+      document.getElementById('target-km').innerText = nextTarget.toFixed(1);
+      updateRadar(0);
+    }
+  }
+
+  if (isTest) document.getElementById('status').innerText = 'Distance simulée (mode test) : +' + Math.round(dist*1000) + ' m';
+}
+
+/* =========================================================
+   SUIVI GPS (avec filtre anti-triche léger)
+========================================================= */
+const MAX_PLAUSIBLE_SPEED_KMH = 25;
+
+if ("geolocation" in navigator){
+  navigator.geolocation.watchPosition(
+    (position) => {
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+      const now = Date.now();
+
+      document.getElementById('status').innerText = "Signal GPS actif";
+
+      if (lastPosition){
+        const dist = calculateDistance(lastPosition.lat, lastPosition.lon, lat, lon);
+        const dtHours = Math.max((now - lastPosition.t) / 3600000, 1/3600000);
+        const speedKmh = dist / dtHours;
+
+        if (dist > 0.005){
+          if (speedKmh > MAX_PLAUSIBLE_SPEED_KMH){
+            document.getElementById('status').innerText = "Déplacement trop rapide ignoré (" + Math.round(speedKmh) + " km/h)";
+          } else {
+            processDistance(dist, false);
+          }
+        }
+      }
+      lastPosition = { lat, lon, t: now };
+    },
+    (error) => {
+      document.getElementById('status').innerText = "Erreur GPS : " + error.message;
+    },
+    { enableHighAccuracy: true, maximumAge: 1000 }
+  );
+} else {
+  document.getElementById('status').innerText = "Géolocalisation non supportée.";
+}
+</script>
+
+</body>
+</html>
