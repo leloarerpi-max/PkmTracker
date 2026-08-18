@@ -111,7 +111,8 @@
   /* Achievements */
   .achievements{ margin-top:16px; background:var(--bg-panel); border:1px solid var(--line); border-radius:16px; padding:12px 14px; }
   .achievements h3{ font-size:0.82em; margin:0 0 10px; display:flex; align-items:center; gap:6px; }
-  .ach-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(84px,1fr)); gap:8px; }
+  .ach-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(84px,1fr)); gap:8px;
+    max-height:280px; overflow-y:auto; padding:2px; }
   .ach-item{ background:var(--bg-card); border:1px solid var(--line); border-radius:12px; padding:8px 6px;
     text-align:center; font-size:0.66em; opacity:0.4; filter:grayscale(0.6); }
   .ach-item.unlocked{ opacity:1; filter:none; border-color:var(--gold); box-shadow:0 0 8px rgba(255,205,60,0.2); }
@@ -271,11 +272,69 @@
 
   ::-webkit-scrollbar{ width:8px; }
   ::-webkit-scrollbar-thumb{ background:var(--line); border-radius:8px; }
+
+  /* --- Accent coloré par type pendant une rencontre --- */
+  .stage{ transition:box-shadow .4s ease, border-color .4s ease, background .4s ease; }
+
+  /* --- Overlay météo animée (pluie / neige) --- */
+  #weather-canvas{ position:fixed; inset:0; width:100vw; height:100vh; pointer-events:none; z-index:5; opacity:0.5; }
+
+  /* --- Flash de niveau --- */
+  #levelup-flash{ position:fixed; inset:0; z-index:70; pointer-events:none; opacity:0;
+    background:radial-gradient(circle, rgba(255,205,60,0.55), rgba(255,205,60,0) 70%); }
+  #levelup-flash.show{ animation:levelupFlash 0.9s ease-out; }
+  @keyframes levelupFlash{
+    0%{ opacity:0; transform:scale(0.6); }
+    30%{ opacity:1; transform:scale(1.05); }
+    100%{ opacity:0; transform:scale(1.4); }
+  }
+
+  /* --- Calendrier de série --- */
+  .streak-cal{ display:flex; gap:4px; overflow-x:auto; padding:4px 2px 8px; margin-top:8px; }
+  .streak-cal-day{ flex:0 0 auto; width:22px; height:22px; border-radius:6px; background:var(--bg-card);
+    border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:0.55em; color:var(--ink-dim); }
+  .streak-cal-day.played{ background:var(--green); border-color:var(--green); color:#0e1526; font-weight:800; }
+  .streak-cal-day.today{ box-shadow:0 0 0 2px var(--gold); }
+
+  /* --- Graphique de progression --- */
+  .progress-chart-wrap{ margin-top:16px; background:var(--bg-panel); border:1px solid var(--line); border-radius:16px; padding:12px 14px; }
+  .progress-chart-wrap h3{ font-size:0.85em; margin:0 0 8px; display:flex; align-items:center; gap:6px; }
+  #progress-chart{ width:100%; height:110px; display:block; }
+
+  /* --- Compagnon --- */
+  .companion-chip{ cursor:default; }
+  .companion-chip img{ width:18px; height:18px; border-radius:50%; vertical-align:middle; }
+
+  /* --- Baies --- */
+  .berry-chip{ cursor:default; }
+  .berry-use-btn{ background:linear-gradient(180deg,#ff8fab,#e05575); color:#fff; border:none; border-radius:12px;
+    padding:9px 12px; font-size:0.78em; font-weight:700; cursor:pointer; margin-top:8px; width:100%; }
+  .berry-use-btn:disabled{ opacity:0.4; cursor:not-allowed; }
+  .berry-active-note{ font-size:0.72em; color:#ff8fab; font-weight:700; margin-top:6px; text-align:center; }
+
+  /* --- Défi hebdomadaire --- */
+  .weekly-quest{ margin-top:16px; background:var(--bg-panel); border:1px solid var(--gold); border-radius:16px; padding:12px 14px; }
+  .weekly-quest h3{ font-size:0.82em; margin:0 0 8px; display:flex; align-items:center; gap:6px; color:var(--gold); }
+
+  /* --- Bannière boost week-end --- */
+  .weekend-banner{ margin-top:12px; background:linear-gradient(90deg, rgba(255,205,60,0.18), rgba(239,77,94,0.12));
+    border:1px solid var(--gold); border-radius:14px; padding:9px 12px; font-size:0.78em; font-weight:700;
+    text-align:center; color:var(--gold); display:none; }
+  .weekend-banner.show{ display:block; }
+
+  /* --- Combo de captures --- */
+  .combo-badge{ display:inline-block; background:linear-gradient(90deg,#ff8fab,#ffcd3c); color:#2a1d00;
+    font-size:0.72em; font-weight:800; padding:3px 10px; border-radius:999px; margin-top:6px; }
+
+  /* --- Palier Platine (badges de type) --- */
+  .type-badge-item.platinum{ box-shadow:0 0 12px rgba(190,220,255,0.5); }
 </style>
 </head>
 <body>
 
 <div class="toast" id="toast"></div>
+<canvas id="weather-canvas"></canvas>
+<div id="levelup-flash"></div>
 <canvas id="confetti-canvas"></canvas>
 
 <div class="card">
@@ -304,8 +363,13 @@
     </div>
     <div class="chip incense-chip" id="incense-chip" title="Activer l'Encens (booste les rencontres 15 min)">🌸 <span id="incense-count">0</span></div>
     <div class="chip weather-chip" id="weather-chip" title="Météo locale : influence les types de Pokémon">🌤️ <span id="weather-label">--</span></div>
+    <div class="chip berry-chip" id="berry-chip" title="Baies trouvées en marchant, utilisables pendant une capture">🍓 <span id="berry-count">0</span></div>
+    <div class="chip companion-chip" id="companion-chip" title="Ton Pokémon compagnon (choisi depuis le Pokédex)">🐾 <span id="companion-label">Aucun</span></div>
     <div class="chip mute-chip clickable" id="mute-chip" title="Couper / activer le son">🔊</div>
+    <div class="chip clickable" id="theme-chip" title="Passer en mode clair">🌙</div>
   </div>
+
+  <div class="weekend-banner" id="weekend-banner">🎉 Boost week-end actif : XP doublée et rencontres plus fréquentes !</div>
 
   <div class="trainer-row">
     <div class="labels">
@@ -350,6 +414,17 @@
   <div class="quests" id="quests-panel">
     <h3>🎯 Défis du jour</h3>
     <div id="quests-list"></div>
+    <div class="streak-cal" id="streak-cal"></div>
+  </div>
+
+  <div class="weekly-quest" id="weekly-quest-panel">
+    <h3>🗓️ Défi de la semaine</h3>
+    <div id="weekly-quest-content"></div>
+  </div>
+
+  <div class="progress-chart-wrap">
+    <h3>📈 Progression (14 derniers jours)</h3>
+    <canvas id="progress-chart" width="400" height="110"></canvas>
   </div>
 
   <div class="achievements" id="achievements-panel">
@@ -407,7 +482,8 @@ let trainer   = JSON.parse(localStorage.getItem('trainerState'))|| {
   balls:{poke:5, great:0, ultra:0, master:0}, selectedBall:'poke',
   incense:{count:0, activeUntil:0},
   dailyKm:{}, streak:{count:0,lastDate:null}, quests:null,
-  muted:false, achievements:{}, shinyPity:0, lastRaidKm:0, typeBadges:{}
+  muted:false, achievements:{}, shinyPity:0, lastRaidKm:0, typeBadges:{},
+  companionId:null, berries:{count:0}, weeklyQuest:null, captureCombo:0, lightMode:false
 };
 trainer.dailyKm = trainer.dailyKm || {};
 trainer.streak = trainer.streak || {count:0,lastDate:null};
@@ -424,6 +500,11 @@ trainer.achievements = trainer.achievements || {};
 trainer.shinyPity = trainer.shinyPity || 0;
 trainer.lastRaidKm = trainer.lastRaidKm || 0;
 trainer.typeBadges = trainer.typeBadges || {};
+trainer.companionId = trainer.companionId || null;
+trainer.berries = trainer.berries || { count:0 };
+trainer.weeklyQuest = trainer.weeklyQuest || null;
+trainer.captureCombo = trainer.captureCombo || 0;
+trainer.lightMode = !!trainer.lightMode;
 
 const BALL_INFO = {
   poke:  { label:'Poké Ball',  emoji:'🔴', unlockLevel:1,  multiplier:1.0 },
@@ -515,27 +596,94 @@ const RANK_TITLES = [
 ];
 
 /* --- Succès --- */
+function catchCount(){ return Object.keys(pokedex).length; }
+function shinyCount(){ return Object.values(pokedex).filter(p => p.isShiny).length; }
+function legendaryCount(){ return Object.values(pokedex).filter(p => p.isLegendary).length; }
+
 const ACHIEVEMENTS = [
-  { id:'first_catch', icon:'🎯', label:'Premier pas', desc:'Capturer 1 Pokémon', check: () => Object.keys(pokedex).length >= 1 },
-  { id:'ten_catches', icon:'📘', label:'Collectionneur', desc:'Capturer 10 Pokémon', check: () => Object.keys(pokedex).length >= 10 },
-  { id:'fifty_catches', icon:'📗', label:'Expert', desc:'Capturer 50 Pokémon', check: () => Object.keys(pokedex).length >= 50 },
-  { id:'hundred_catches', icon:'📕', label:'Maître Pokédex', desc:'Capturer 100 Pokémon', check: () => Object.keys(pokedex).length >= 100 },
-  { id:'first_shiny', icon:'✨', label:'Chromatique !', desc:'Capturer 1 Pokémon chromatique', check: () => Object.values(pokedex).some(p => p.isShiny) },
-  { id:'first_legendary', icon:'👑', label:'Légende', desc:'Capturer 1 Pokémon légendaire', check: () => Object.values(pokedex).some(p => p.isLegendary) },
-  { id:'walk_10km', icon:'🚶', label:'Marcheur', desc:'Parcourir 10 km au total', check: () => totalDistance >= 10 },
-  { id:'walk_50km', icon:'🏃', label:'Randonneur', desc:'Parcourir 50 km au total', check: () => totalDistance >= 50 },
-  { id:'walk_100km', icon:'🥾', label:'Explorateur', desc:'Parcourir 100 km au total', check: () => totalDistance >= 100 },
-  { id:'streak_7', icon:'🔥', label:'Série de 7', desc:'7 jours de suite', check: () => trainer.streak.count >= 7 },
-  { id:'streak_30', icon:'🔥', label:'Série de 30', desc:'30 jours de suite', check: () => trainer.streak.count >= 30 },
-  { id:'evolve_first', icon:'🍬', label:'Évolution', desc:'Faire évoluer 1 Pokémon', check: () => trainer._hasEvolved === true },
-  { id:'raid_first', icon:'⚔️', label:'Chasseur de raid', desc:'Vaincre 1 raid', check: () => trainer._raidWins > 0 },
+  // Captures
+  { id:'catch_1',   icon:'🎯', label:'Premier pas',        desc:'Capturer 1 Pokémon',    check: () => catchCount() >= 1 },
+  { id:'catch_5',   icon:'🎯', label:'Petit groupe',        desc:'Capturer 5 Pokémon',    check: () => catchCount() >= 5 },
+  { id:'catch_10',  icon:'📘', label:'Collectionneur',      desc:'Capturer 10 Pokémon',   check: () => catchCount() >= 10 },
+  { id:'catch_25',  icon:'📘', label:'Passionné',           desc:'Capturer 25 Pokémon',   check: () => catchCount() >= 25 },
+  { id:'catch_50',  icon:'📗', label:'Expert',              desc:'Capturer 50 Pokémon',   check: () => catchCount() >= 50 },
+  { id:'catch_100', icon:'📕', label:'Maître Pokédex',      desc:'Capturer 100 Pokémon',  check: () => catchCount() >= 100 },
+  { id:'catch_150', icon:'📕', label:'Encyclopédiste',      desc:'Capturer 150 Pokémon',  check: () => catchCount() >= 150 },
+  { id:'catch_250', icon:'📚', label:'Archiviste',          desc:'Capturer 250 Pokémon',  check: () => catchCount() >= 250 },
+  { id:'catch_500', icon:'📚', label:'Grand Maître',        desc:'Capturer 500 Pokémon',  check: () => catchCount() >= 500 },
+  { id:'catch_all', icon:'🏆', label:'Pokédex complet',     desc:'Capturer les 1025 Pokémon', check: () => catchCount() >= 1025 },
+
+  // Chromatiques
+  { id:'shiny_1',  icon:'✨', label:'Chromatique !',          desc:'Capturer 1 Pokémon chromatique',   check: () => shinyCount() >= 1 },
+  { id:'shiny_5',  icon:'✨', label:'Chasseur de brillance',  desc:'Capturer 5 Pokémon chromatiques',  check: () => shinyCount() >= 5 },
+  { id:'shiny_10', icon:'✨', label:'Éclat rare',             desc:'Capturer 10 Pokémon chromatiques', check: () => shinyCount() >= 10 },
+
+  // Légendaires
+  { id:'legend_1',  icon:'👑', label:'Légende',          desc:'Capturer 1 Pokémon légendaire',   check: () => legendaryCount() >= 1 },
+  { id:'legend_5',  icon:'👑', label:'Cercle des légendes', desc:'Capturer 5 Pokémon légendaires',  check: () => legendaryCount() >= 5 },
+  { id:'legend_10', icon:'👑', label:'Panthéon',          desc:'Capturer 10 Pokémon légendaires', check: () => legendaryCount() >= 10 },
+
+  // Raids
+  { id:'raid_1',  icon:'⚔️', label:'Chasseur de raid',   desc:'Vaincre 1 raid',   check: () => (trainer._raidWins||0) >= 1 },
+  { id:'raid_5',  icon:'⚔️', label:'Vétéran des raids',  desc:'Vaincre 5 raids',  check: () => (trainer._raidWins||0) >= 5 },
+  { id:'raid_10', icon:'⚔️', label:'Champion des raids', desc:'Vaincre 10 raids', check: () => (trainer._raidWins||0) >= 10 },
+
+  // Distance
+  { id:'walk_5',    icon:'👣', label:'Premiers pas',    desc:'Parcourir 5 km',    check: () => totalDistance >= 5 },
+  { id:'walk_10',   icon:'🚶', label:'Marcheur',        desc:'Parcourir 10 km',   check: () => totalDistance >= 10 },
+  { id:'walk_25',   icon:'🚶', label:'Bonne marche',    desc:'Parcourir 25 km',   check: () => totalDistance >= 25 },
+  { id:'walk_50',   icon:'🏃', label:'Randonneur',      desc:'Parcourir 50 km',   check: () => totalDistance >= 50 },
+  { id:'walk_100',  icon:'🥾', label:'Explorateur',     desc:'Parcourir 100 km',  check: () => totalDistance >= 100 },
+  { id:'walk_250',  icon:'🥾', label:'Grand voyageur',  desc:'Parcourir 250 km',  check: () => totalDistance >= 250 },
+  { id:'walk_500',  icon:'🌍', label:'Globe-trotteur',  desc:'Parcourir 500 km',  check: () => totalDistance >= 500 },
+  { id:'walk_1000', icon:'🌍', label:'Marathonien',     desc:'Parcourir 1000 km', check: () => totalDistance >= 1000 },
+
+  // Séries
+  { id:'streak_7',   icon:'🔥', label:'Série de 7',       desc:'7 jours de suite',   check: () => trainer.streak.count >= 7 },
+  { id:'streak_30',  icon:'🔥', label:'Série de 30',      desc:'30 jours de suite',  check: () => trainer.streak.count >= 30 },
+  { id:'streak_100', icon:'🔥', label:'Série de 100',     desc:'100 jours de suite', check: () => trainer.streak.count >= 100 },
+  { id:'streak_365', icon:'🔥', label:'Une année entière', desc:'365 jours de suite', check: () => trainer.streak.count >= 365 },
+
+  // Évolutions
+  { id:'evolve_1',  icon:'🍬', label:'Évolution',              desc:'Faire évoluer 1 Pokémon',  check: () => (trainer._evolveCount||0) >= 1 },
+  { id:'evolve_5',  icon:'🍬', label:'Généticien amateur',     desc:'Faire évoluer 5 Pokémon',  check: () => (trainer._evolveCount||0) >= 5 },
+  { id:'evolve_20', icon:'🍬', label:'Maître des évolutions',  desc:'Faire évoluer 20 Pokémon', check: () => (trainer._evolveCount||0) >= 20 },
+
+  // Niveau
+  { id:'level_10', icon:'⭐', label:'Dresseur confirmé',   desc:'Atteindre le niveau 10', check: () => trainer.level >= 10 },
+  { id:'level_25', icon:'⭐', label:'Dresseur chevronné',  desc:'Atteindre le niveau 25', check: () => trainer.level >= 25 },
+  { id:'level_50', icon:'⭐', label:'Dresseur légendaire', desc:'Atteindre le niveau 50', check: () => trainer.level >= 50 },
+
+  // Défis quotidiens
+  { id:'quest_1',   icon:'🎯', label:'Premier défi',        desc:'Compléter 1 défi quotidien',    check: () => (trainer._questsCompleted||0) >= 1 },
+  { id:'quest_25',  icon:'🎯', label:'Habitué des défis',   desc:'Compléter 25 défis quotidiens', check: () => (trainer._questsCompleted||0) >= 25 },
+  { id:'quest_100', icon:'🎯', label:'Machine à défis',     desc:'Compléter 100 défis quotidiens', check: () => (trainer._questsCompleted||0) >= 100 },
+
+  // Œufs
+  { id:'egg_1',  icon:'🥚', label:'Éclosion',           desc:'Faire éclore 1 Œuf',   check: () => (trainer._eggsHatched||0) >= 1 },
+  { id:'egg_10', icon:'🥚', label:'Couveuse experte',   desc:'Faire éclore 10 Œufs', check: () => (trainer._eggsHatched||0) >= 10 },
+
+  // Lancers parfaits
+  { id:'perfect_1',  icon:'🎯', label:'Lancer parfait',        desc:'Réussir 1 capture au centre doré',   check: () => (trainer._perfectThrows||0) >= 1 },
+  { id:'perfect_10', icon:'🎯', label:'Précision chirurgicale', desc:'Réussir 10 captures au centre doré', check: () => (trainer._perfectThrows||0) >= 10 },
+  { id:'perfect_50', icon:'🎯', label:'Sniper',                desc:'Réussir 50 captures au centre doré', check: () => (trainer._perfectThrows||0) >= 50 },
+
+  // Bonbons
+  { id:'candy_50',  icon:'🍭', label:'Amateur de bonbons', desc:'Gagner 50 bonbons au total',  check: () => (trainer._candiesEarnedTotal||0) >= 50 },
+  { id:'candy_250', icon:'🍭', label:'Confiseur',          desc:'Gagner 250 bonbons au total', check: () => (trainer._candiesEarnedTotal||0) >= 250 },
+
+  // Badges de type (méta)
+  { id:'badges_bronze', icon:'🥉', label:'Tour du monde Bronze', desc:'Badge Bronze dans les 18 types', check: () => Object.keys(TYPE_INFO).every(t => (trainer.typeBadges[t] ?? -1) >= 0) },
+  { id:'badges_silver', icon:'🥈', label:'Tour du monde Argent', desc:'Badge Argent dans les 18 types', check: () => Object.keys(TYPE_INFO).every(t => (trainer.typeBadges[t] ?? -1) >= 1) },
+  { id:'badges_gold',   icon:'🥇', label:'Tour du monde Or',     desc:'Badge Or dans les 18 types',     check: () => Object.keys(TYPE_INFO).every(t => (trainer.typeBadges[t] ?? -1) >= 2) },
 ];
 
 /* --- Badges de type (façon médailles Pokémon GO) --- */
 const TYPE_BADGE_TIERS = [
-  { tier:'Bronze', icon:'🥉', min:5 },
-  { tier:'Argent', icon:'🥈', min:15 },
-  { tier:'Or',     icon:'🥇', min:30 }
+  { tier:'Bronze',  icon:'🥉', min:5 },
+  { tier:'Argent',  icon:'🥈', min:15 },
+  { tier:'Or',      icon:'🥇', min:30 },
+  { tier:'Platine', icon:'💎', min:60 }
 ];
 
 // Compte, pour chaque type, le nombre d'espèces DIFFÉRENTES capturées
@@ -573,7 +721,10 @@ function checkTypeBadges(){
       showToast(tierInfo.icon + ' Badge ' + tierInfo.tier + ' — ' + TYPE_INFO[t].fr + ' débloqué !', 'gold');
     }
   });
-  if (newBadge){ fireConfetti(false); saveAll(); renderTypeBadges(); }
+  if (newBadge){ fireConfetti(false); saveAll(); }
+  // On rafraîchit toujours l'affichage (pas seulement si un palier est franchi) pour que
+  // la progression (ex: 3/5) avance visuellement à chaque capture, pas seulement à chaque médaille.
+  renderTypeBadges();
 }
 
 function renderTypeBadges(){
@@ -593,7 +744,7 @@ function renderTypeBadges(){
       : count + ' (max)';
     const pct = nextTier ? Math.min(100, (count / nextTier.min) * 100) : 100;
     return `
-      <div class="type-badge-item ${tierInfo ? 'has-badge' : ''}" style="border-color:${tierInfo ? info.color : 'var(--line)'}" title="${info.fr} · ${count} espèce(s) capturée(s)">
+      <div class="type-badge-item ${tierInfo ? 'has-badge' : ''} ${idx === TYPE_BADGE_TIERS.length - 1 ? 'platinum' : ''}" style="border-color:${tierInfo ? info.color : 'var(--line)'}" title="${info.fr} · ${count} espèce(s) capturée(s)">
         <span class="tb-icon">${tierInfo ? tierInfo.icon : '⬡'}</span>
         <strong style="color:${tierInfo ? info.color : 'var(--ink)'}">${info.fr}</strong>
         <span class="tb-progress">${tierInfo ? tierInfo.tier : 'Aucun'}</span>
@@ -605,6 +756,321 @@ function renderTypeBadges(){
   const progressEl = document.getElementById('type-badges-progress');
   if (progressEl) progressEl.innerText = unlockedTypes + '/' + Object.keys(TYPE_INFO).length;
 }
+
+/* =========================================================
+   BOOST WEEK-END
+========================================================= */
+function isWeekendBoost(){
+  const day = new Date().getDay(); // 0 = dimanche, 6 = samedi
+  return day === 0 || day === 6;
+}
+function renderWeekendBanner(){
+  document.getElementById('weekend-banner').classList.toggle('show', isWeekendBoost());
+}
+
+/* =========================================================
+   COMPAGNON
+========================================================= */
+function setCompanion(pokedexKey){
+  trainer.companionId = pokedexKey;
+  saveAll();
+  renderCompanion();
+  showToast('🐾 ' + (pokedex[pokedexKey] ? pokedex[pokedexKey].name : 'Pokémon') + ' est maintenant ton compagnon !', 'gold');
+}
+function renderCompanion(){
+  const label = document.getElementById('companion-label');
+  const mon = trainer.companionId ? pokedex[trainer.companionId] : null;
+  label.innerText = mon ? mon.name : 'Aucun';
+  document.getElementById('companion-chip').title = mon
+    ? mon.name + ' est ton compagnon : +1 bonbon tous les 5 km parcourus'
+    : "Choisis un compagnon depuis le Pokédex pour gagner +1 bonbon tous les 5 km";
+}
+// Bonus passif du compagnon : appelé à chaque pas de marche.
+function applyCompanionBonus(distanceWalkedKm){
+  if (!trainer.companionId || !pokedex[trainer.companionId]) return;
+  trainer._companionProgress = (trainer._companionProgress || 0) + distanceWalkedKm;
+  let granted = false;
+  while (trainer._companionProgress >= 5){
+    trainer._companionProgress -= 5;
+    addCandies(1);
+    granted = true;
+  }
+  if (granted){ renderCandies(); showToast('🐾 Ton compagnon a trouvé +1 🍬 !'); }
+}
+
+/* =========================================================
+   BAIES (objet de capture, distinct de l'Encens)
+========================================================= */
+const BERRY_FIND_CHANCE_PER_KM = 0.15; // ~15% de chance de trouver une baie par km parcouru
+const BERRY_CAPTURE_BONUS = 0.15;      // bonus de chance de capture appliqué au prochain lancer
+
+function withBerryBonus(chance){
+  return trainer._berryActive ? Math.min(0.97, chance + BERRY_CAPTURE_BONUS) : chance;
+}
+
+function renderBerries(){
+  document.getElementById('berry-count').innerText = trainer.berries.count || 0;
+}
+// Chance de trouver une baie en marchant : appelé à chaque pas de marche.
+function maybeFindBerry(distanceWalkedKm){
+  const chance = 1 - Math.pow(1 - BERRY_FIND_CHANCE_PER_KM, distanceWalkedKm);
+  if (Math.random() < chance && (trainer.berries.count || 0) < 20){
+    trainer.berries.count = (trainer.berries.count || 0) + 1;
+    saveAll();
+    renderBerries();
+    pulseChip('berry-chip');
+    showToast('🍓 Une Baie a été trouvée sur le chemin !');
+  }
+}
+function useBerry(){
+  if ((trainer.berries.count || 0) <= 0) return;
+  trainer.berries.count -= 1;
+  trainer._berryActive = true;
+  saveAll();
+  renderBerries();
+  const mon = currentEncounter;
+  if (mon) renderEncounter(mon, true);
+  showToast('🍓 Baie utilisée : chance de capture augmentée pour ce lancer !', 'green');
+}
+
+/* =========================================================
+   DÉFI HEBDOMADAIRE
+========================================================= */
+function isoWeekKey(d){
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = (date.getUTCDay() + 6) % 7; // lundi = 0
+  date.setUTCDate(date.getUTCDate() - day + 3);
+  const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((date - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+  return date.getUTCFullYear() + '-W' + week;
+}
+function generateWeeklyQuest(){
+  const options = [
+    { type:'walk_km', target: 15 + Math.floor(Math.random()*16), reward:{ xp:200, balls:5, candies:15 } },
+    { type:'catch_n', target: 10 + Math.floor(Math.random()*11), reward:{ xp:250, balls:6, candies:10 } },
+    { type:'raid_n',  target: 2 + Math.floor(Math.random()*2),   reward:{ xp:300, balls:4, candies:20 } }
+  ];
+  const chosen = options[Math.floor(Math.random() * options.length)];
+  return { week: isoWeekKey(new Date()), ...chosen, progress: 0, done: false };
+}
+function ensureWeeklyQuest(){
+  const key = isoWeekKey(new Date());
+  if (!trainer.weeklyQuest || trainer.weeklyQuest.week !== key){
+    trainer.weeklyQuest = generateWeeklyQuest();
+    saveAll();
+  }
+}
+function weeklyQuestLabel(q){
+  if (q.type === 'walk_km') return 'Marcher ' + q.target + ' km cette semaine';
+  if (q.type === 'catch_n') return 'Capturer ' + q.target + ' Pokémon cette semaine';
+  if (q.type === 'raid_n')  return 'Vaincre ' + q.target + ' Raid(s) cette semaine';
+  return '';
+}
+function completeWeeklyQuest(){
+  const q = trainer.weeklyQuest;
+  q.done = true;
+  trainer.balls.poke = Math.min(maxBallCapacity(), trainer.balls.poke + (q.reward.balls || 0));
+  addCandies(q.reward.candies || 0);
+  renderBalls(); renderCandies();
+  showToast('🗓️ Défi hebdomadaire complété ! +' + q.reward.xp + ' XP, +' + q.reward.balls + ' Poké Balls, +' + q.reward.candies + ' 🍬', 'gold');
+  fireConfetti(true);
+  addXP(q.reward.xp || 0);
+}
+function updateWeeklyQuestOnWalk(dist){
+  ensureWeeklyQuest();
+  const q = trainer.weeklyQuest;
+  if (q.done || q.type !== 'walk_km') return;
+  q.progress += dist;
+  saveAll();
+  if (q.progress >= q.target) completeWeeklyQuest();
+  renderWeeklyQuest();
+}
+function updateWeeklyQuestOnCatch(){
+  ensureWeeklyQuest();
+  const q = trainer.weeklyQuest;
+  if (q.done || q.type !== 'catch_n') return;
+  q.progress += 1;
+  saveAll();
+  if (q.progress >= q.target) completeWeeklyQuest();
+  renderWeeklyQuest();
+}
+function updateWeeklyQuestOnRaidWin(){
+  ensureWeeklyQuest();
+  const q = trainer.weeklyQuest;
+  if (q.done || q.type !== 'raid_n') return;
+  q.progress += 1;
+  saveAll();
+  if (q.progress >= q.target) completeWeeklyQuest();
+  renderWeeklyQuest();
+}
+function renderWeeklyQuest(){
+  ensureWeeklyQuest();
+  const q = trainer.weeklyQuest;
+  const pct = Math.min(100, (q.progress / q.target) * 100);
+  document.getElementById('weekly-quest-content').innerHTML = `
+    <div class="quest-item ${q.done ? 'done' : ''}">
+      <div class="quest-check">${q.done ? '✓' : ''}</div>
+      <div class="quest-track">
+        <div>${weeklyQuestLabel(q)}</div>
+        <div class="quest-bar"><div class="quest-bar-fill" style="width:${pct}%; background:var(--gold);"></div></div>
+      </div>
+      <div class="quest-reward">+${q.reward.xp}xp +${q.reward.balls}⚪ +${q.reward.candies}🍬</div>
+    </div>
+  `;
+}
+
+/* =========================================================
+   CALENDRIER DE SÉRIE
+========================================================= */
+function renderStreakCalendar(){
+  const el = document.getElementById('streak-cal');
+  if (!el) return;
+  const days = [];
+  const today = new Date();
+  for (let i = 13; i >= 0; i--){
+    const d = new Date(today.getTime() - i * 86400000);
+    const iso = d.toISOString().slice(0,10);
+    const played = (trainer.dailyKm[iso] || 0) > 0;
+    const isToday = i === 0;
+    days.push(`<div class="streak-cal-day ${played ? 'played' : ''} ${isToday ? 'today' : ''}" title="${iso}${played ? ' · joué' : ''}">${d.getDate()}</div>`);
+  }
+  el.innerHTML = days.join('');
+}
+
+/* =========================================================
+   GRAPHIQUE DE PROGRESSION (14 derniers jours, km/jour)
+========================================================= */
+function renderProgressChart(){
+  const canvas = document.getElementById('progress-chart');
+  if (!canvas || !canvas.getContext) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const today = new Date();
+  const values = [];
+  const labels = [];
+  for (let i = 13; i >= 0; i--){
+    const d = new Date(today.getTime() - i * 86400000);
+    const iso = d.toISOString().slice(0,10);
+    values.push(trainer.dailyKm[iso] || 0);
+    labels.push(d.getDate());
+  }
+  const max = Math.max(1, ...values);
+  const barW = W / values.length;
+  const padBottom = 16;
+
+  ctx.fillStyle = '#8b93b8';
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'center';
+
+  values.forEach((v, i) => {
+    const h = (v / max) * (H - padBottom - 6);
+    const x = i * barW + barW * 0.2;
+    const w = barW * 0.6;
+    const y = H - padBottom - h;
+    ctx.fillStyle = v > 0 ? '#6ee7ff' : '#262f4d';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#8b93b8';
+    ctx.fillText(String(labels[i]), x + w/2, H - 4);
+  });
+}
+
+/* =========================================================
+   OVERLAY MÉTÉO ANIMÉE
+========================================================= */
+let weatherParticles = [];
+let weatherAnimFrame = null;
+function weatherGroupFromLabel(label){
+  if (!label) return null;
+  if (label === 'Pluvieux') return 'rain';
+  if (label === 'Neigeux') return 'snow';
+  if (label === 'Orageux') return 'storm';
+  return null;
+}
+function startWeatherOverlay(group){
+  stopWeatherOverlay();
+  const canvas = document.getElementById('weather-canvas');
+  if (!canvas || !canvas.getContext) return;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const count = group === 'snow' ? 40 : 70;
+  weatherParticles = Array.from({length: count}, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    speed: group === 'snow' ? (0.5 + Math.random()) : (6 + Math.random() * 6),
+    drift: group === 'snow' ? (-0.5 + Math.random()) : 0,
+    len: group === 'rain' || group === 'storm' ? 10 + Math.random()*10 : 0,
+    r: group === 'snow' ? 1.5 + Math.random()*2 : 0
+  }));
+  function draw(){
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = 'rgba(180,210,255,0.5)';
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    weatherParticles.forEach(p => {
+      if (group === 'snow'){
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        ctx.fill();
+        p.y += p.speed; p.x += p.drift;
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - 2, p.y + p.len);
+        ctx.stroke();
+        p.y += p.speed;
+      }
+      if (p.y > canvas.height){ p.y = -10; p.x = Math.random() * canvas.width; }
+    });
+    weatherAnimFrame = requestAnimationFrame(draw);
+  }
+  draw();
+}
+function stopWeatherOverlay(){
+  if (weatherAnimFrame) cancelAnimationFrame(weatherAnimFrame);
+  weatherAnimFrame = null;
+  const canvas = document.getElementById('weather-canvas');
+  if (canvas && canvas.getContext){ const ctx = canvas.getContext('2d'); if (ctx) ctx.clearRect(0,0,canvas.width,canvas.height); }
+}
+
+/* =========================================================
+   FLASH DE NIVEAU
+========================================================= */
+function playLevelUpFlash(){
+  const el = document.getElementById('levelup-flash');
+  if (!el) return;
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 950);
+}
+
+/* =========================================================
+   COULEUR D'ACCENT PAR TYPE (rencontre)
+========================================================= */
+function hexToRgba(hex, alpha){
+  const h = hex.replace('#','');
+  const r = parseInt(h.substring(0,2), 16), g = parseInt(h.substring(2,4), 16), b = parseInt(h.substring(4,6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+function applyTypeAccent(mon){
+  const stage = document.getElementById('pokemon-area');
+  if (!stage || !mon || !mon.types || !mon.types.length) return;
+  const info = TYPE_INFO[mon.types[0]];
+  if (!info) return;
+  stage.style.borderColor = info.color;
+  stage.style.background = `linear-gradient(180deg, ${hexToRgba(info.color, 0.14)}, var(--bg-panel) 65%)`;
+}
+function clearTypeAccent(){
+  const stage = document.getElementById('pokemon-area');
+  if (!stage) return;
+  stage.style.borderColor = '';
+  stage.style.background = '';
+}
+
 
 /* =========================================================
    INITIALISATION UI
@@ -624,8 +1090,17 @@ renderTypeBadges();
 renderStats();
 renderIncense();
 renderMuteButton();
+renderThemeButton();
+renderCompanion();
+renderBerries();
+ensureWeeklyQuest();
+renderWeeklyQuest();
+renderStreakCalendar();
+renderProgressChart();
+renderWeekendBanner();
 applyDayNightTheme();
 setInterval(applyDayNightTheme, 5 * 60 * 1000);
+setInterval(renderWeekendBanner, 60 * 60 * 1000);
 populateTypeFilter();
 fetchWeather();
 setInterval(fetchWeather, 30 * 60 * 1000);
@@ -636,6 +1111,7 @@ document.getElementById('test-btn-5000').addEventListener('click', () => process
 
 document.getElementById('incense-chip').addEventListener('click', activateIncense);
 document.getElementById('mute-chip').addEventListener('click', toggleMute);
+document.getElementById('theme-chip').addEventListener('click', toggleLightMode);
 
 document.getElementById('pokedex-search').addEventListener('input', renderPokedex);
 document.getElementById('pokedex-filter-type').addEventListener('change', renderPokedex);
@@ -663,8 +1139,9 @@ function saveAll(){
 
 function generateRandomDistance(){
   const base = Math.random() * (5.0 - 0.5) + 0.5;
-  const factor = isIncenseActive() ? 0.5 : 1;
-  return parseFloat((base * factor).toFixed(1));
+  const incenseFactor = isIncenseActive() ? 0.5 : 1;
+  const weekendFactor = isWeekendBoost() ? 0.7 : 1;
+  return parseFloat((base * incenseFactor * weekendFactor).toFixed(1));
 }
 
 function calculateDistance(lat1, lon1, lat2, lon2){
@@ -754,8 +1231,27 @@ function announceEncounter(message){
    THÈME JOUR / NUIT
 ========================================================= */
 function applyDayNightTheme(){
-  const hour = new Date().getHours();
   const root = document.documentElement.style;
+
+  if (trainer.lightMode){
+    // Palette claire fixe : pas de cycle jour/nuit tant que ce mode est actif.
+    root.setProperty('--bg-deep', '#eef1f8');
+    root.setProperty('--bg-card', '#ffffff');
+    root.setProperty('--bg-panel', '#f4f6fc');
+    root.setProperty('--grad1', '#dbe4ff');
+    root.setProperty('--grad2', '#ffe1ec');
+    root.setProperty('--line', '#d9deec');
+    root.setProperty('--ink', '#1a2035');
+    root.setProperty('--ink-dim', '#5b6280');
+    return;
+  }
+
+  // Mode sombre : rétablit les couleurs de texte/ligne par défaut (au cas où le mode clair était actif avant)
+  root.setProperty('--line', '#374266');
+  root.setProperty('--ink', '#eef1fb');
+  root.setProperty('--ink-dim', '#8b93b8');
+
+  const hour = new Date().getHours();
   // Palettes selon la période de la journée
   let deep, card, panel, grad1, grad2;
   if (hour >= 5 && hour < 8){          // aube
@@ -772,6 +1268,20 @@ function applyDayNightTheme(){
   root.setProperty('--bg-panel', panel);
   root.setProperty('--grad1', grad1);
   root.setProperty('--grad2', grad2);
+}
+
+function toggleLightMode(){
+  trainer.lightMode = !trainer.lightMode;
+  saveAll();
+  renderThemeButton();
+  applyDayNightTheme();
+  showToast(trainer.lightMode ? '☀️ Mode clair activé' : '🌙 Mode sombre activé');
+}
+function renderThemeButton(){
+  const chip = document.getElementById('theme-chip');
+  if (!chip) return;
+  chip.innerText = trainer.lightMode ? '☀️' : '🌙';
+  chip.title = trainer.lightMode ? 'Repasser en mode sombre' : 'Passer en mode clair';
 }
 
 /* =========================================================
@@ -814,6 +1324,8 @@ function renderWeather(){
     el.innerText = currentWeather.label;
     chip.firstChild.textContent = currentWeather.emoji + ' ';
     chip.title = 'Météo locale (' + currentWeather.label + ') : favorise les types ' + currentWeather.types.map(t => TYPE_INFO[t] ? TYPE_INFO[t].fr : t).join(', ');
+    const group = weatherGroupFromLabel(currentWeather.label);
+    if (group) startWeatherOverlay(group); else stopWeatherOverlay();
   }
 }
 
@@ -915,9 +1427,15 @@ function importSave(evt){
       trainer.shinyPity = trainer.shinyPity || 0;
       trainer.lastRaidKm = trainer.lastRaidKm || 0;
       trainer.typeBadges = trainer.typeBadges || {};
+      trainer.companionId = trainer.companionId || null;
+      trainer.berries = trainer.berries || { count:0 };
+      trainer.weeklyQuest = trainer.weeklyQuest || null;
+      trainer.captureCombo = trainer.captureCombo || 0;
+      trainer.lightMode = !!trainer.lightMode;
       saveAll();
       renderPokedex(); renderTrainer(); renderBalls(); renderCandies(); renderStreak(); renderQuests();
-      renderAchievements(); renderTypeBadges(); renderStats(); renderIncense(); renderMuteButton();
+      renderAchievements(); renderTypeBadges(); renderStats(); renderIncense(); renderMuteButton(); renderThemeButton();
+      renderCompanion(); renderBerries(); ensureWeeklyQuest(); renderWeeklyQuest(); renderStreakCalendar(); renderProgressChart();
       showToast('📥 Sauvegarde importée avec succès !', 'green');
     }catch(e){
       showToast('Fichier de sauvegarde invalide.');
@@ -958,7 +1476,7 @@ function applyLevelUpRewards(lvl){
   trainer.balls.great  = Math.min(cap, trainer.balls.great  + r.great);
   trainer.balls.ultra  = Math.min(cap, trainer.balls.ultra  + r.ultra);
   trainer.balls.master = Math.min(cap, trainer.balls.master + r.master);
-  trainer.candies = (trainer.candies || 0) + r.candies;
+  addCandies(r.candies);
   let msg = '🎉 Niveau ' + lvl + ' atteint ! +' + r.candies + ' 🍬';
   if (r.great) msg += ' +1 Super Ball';
   if (r.ultra) msg += ' +1 Hyper Ball';
@@ -967,6 +1485,7 @@ function applyLevelUpRewards(lvl){
 }
 
 function addXP(amount){
+  if (isWeekendBoost()) amount = Math.round(amount * 2);
   trainer.xp += amount;
   let needed = xpForLevel(trainer.level);
   let leveledUp = false;
@@ -977,6 +1496,7 @@ function addXP(amount){
     leveledUp = true;
     needed = xpForLevel(trainer.level);
     soundLevelUp();
+    playLevelUpFlash();
     applyLevelUpRewards(trainer.level);
     Object.keys(BALL_INFO).forEach(key => {
       if (BALL_INFO[key].unlockLevel === trainer.level){
@@ -991,6 +1511,7 @@ function addXP(amount){
     if (newRank.label !== previousRank.label){
       showToast('🏵️ Nouveau rang : ' + newRank.label + ' !', 'gold');
     }
+    checkAchievements();
   }
   renderTrainer();
   saveAll();
@@ -1005,6 +1526,13 @@ function renderTrainer(){
 }
 
 function renderCandies(){ document.getElementById('candy-count').innerText = trainer.candies || 0; }
+
+// Passe par cette fonction chaque fois que des bonbons sont GAGNÉS (pas dépensés) pour
+// pouvoir suivre le total cumulé au fil du temps, utilisé par les succès "Bonbons".
+function addCandies(amount){
+  trainer.candies = (trainer.candies || 0) + amount;
+  trainer._candiesEarnedTotal = (trainer._candiesEarnedTotal || 0) + amount;
+}
 function renderBalls(){
   document.getElementById('ball-count').innerText = Object.values(trainer.balls).reduce((a,b) => a + b, 0);
 }
@@ -1129,6 +1657,7 @@ function ensureDailyQuests(){
 
 function completeQuest(q){
   q.done = true;
+  trainer._questsCompleted = (trainer._questsCompleted || 0) + 1;
   trainer.balls.poke = Math.min(maxBallCapacity(), trainer.balls.poke + (q.reward.balls || 0));
   let msg = '🏆 Défi complété : +' + (q.reward.xp||0) + ' XP' + (q.reward.balls ? ' +' + q.reward.balls + ' Poké Balls' : '');
   let gotIncense = false;
@@ -1143,6 +1672,7 @@ function completeQuest(q){
   renderBalls();
   renderIncense();
   addXP(q.reward.xp || 0);
+  checkAchievements();
 }
 
 function updateQuestsOnWalk(dist){
@@ -1410,6 +1940,8 @@ function renderEggUI(){
 function hatchEgg(){
   const mon = currentEgg.mon;
   currentEgg = null;
+  trainer._eggsHatched = (trainer._eggsHatched || 0) + 1;
+  checkAchievements();
   presentWildEncounter(mon, false);
 }
 
@@ -1430,6 +1962,7 @@ function renderEncounter(mon, isWild){
   }).join('');
 
   document.getElementById('pokemon-area').classList.toggle('raid', raid);
+  if (raid){ clearTypeAccent(); } else { applyTypeAccent(mon); }
 
   document.getElementById('pokemon-area').innerHTML = `
     ${raid ? '<div class="raid-badge">⚔️ RAID</div>' : ''}
@@ -1449,10 +1982,15 @@ function renderEncounter(mon, isWild){
     document.getElementById('action-slot').innerHTML = renderCaptureUI(mon);
     wireBallSelector();
     startNeedleAnimation(mon);
+    document.getElementById('berry-use-btn')?.addEventListener('click', useBerry);
   } else if (already){
-    document.getElementById('action-slot').innerHTML = renderOwnedActionsUI();
+    document.getElementById('action-slot').innerHTML = renderOwnedActionsUI(mon);
     document.getElementById('share-btn')?.addEventListener('click', () => shareCapture(mon, shiny));
     document.getElementById('evolve-btn')?.addEventListener('click', () => tryEvolve(mon));
+    document.getElementById('companion-btn')?.addEventListener('click', () => {
+      const actualKey = pokedex[mon.id] ? String(mon.id) : String(mon.id) + '-shiny';
+      setCompanion(actualKey);
+    });
   }
 }
 
@@ -1500,11 +2038,13 @@ function renderCaptureUI(mon){
   ensureValidBallSelection();
   const ballInfo = BALL_INFO[trainer.selectedBall];
   const canThrow = totalBallCount() > 0 && trainer.balls[trainer.selectedBall] > 0;
-  const chPerfect = Math.round(computeCaptureChance(mon, 'perfect', trainer.selectedBall, isRaid) * 100);
-  const chSweet = Math.round(computeCaptureChance(mon, 'sweet', trainer.selectedBall, isRaid) * 100);
-  const chOutside = Math.round(computeCaptureChance(mon, 'outside', trainer.selectedBall, isRaid) * 100);
+  const chPerfect = Math.round(withBerryBonus(computeCaptureChance(mon, 'perfect', trainer.selectedBall, isRaid)) * 100);
+  const chSweet = Math.round(withBerryBonus(computeCaptureChance(mon, 'sweet', trainer.selectedBall, isRaid)) * 100);
+  const chOutside = Math.round(withBerryBonus(computeCaptureChance(mon, 'outside', trainer.selectedBall, isRaid)) * 100);
+  const comboHtml = trainer.captureCombo > 1 ? `<div class="combo-badge">🔥 Combo x${trainer.captureCombo}</div>` : '';
   return `
     <div class="catch-zone">
+      ${comboHtml}
       <div class="catch-rate">
         Rareté : ${rarityPct}%${isRaid ? ' · Raid — capture difficile mais grosses récompenses !' : (mon.isLegendary ? ' · Pokémon légendaire !' : '')}<br>
         Avec la ${ballInfo.label} → 🟡 Centre doré : <b>${chPerfect}%</b> · 🟢 Zone verte : <b>${chSweet}%</b> · Ailleurs : <b>${chOutside}%</b>
@@ -1520,6 +2060,9 @@ function renderCaptureUI(mon){
         <button class="secondary" id="flee-btn">Laisser partir</button>
       </div>
       ${totalBallCount()<=0 ? '<p class="out-of-balls-hint">⚠️ Plus de Poké Balls ! Marchez pour en retrouver.</p>' : ''}
+      ${trainer._berryActive
+        ? '<p class="berry-active-note">🍓 Baie active : chance de capture augmentée pour ce lancer</p>'
+        : `<button class="berry-use-btn" id="berry-use-btn" ${(trainer.berries.count||0) <= 0 ? 'disabled' : ''}>🍓 Utiliser une Baie (${trainer.berries.count||0}) — +${Math.round(BERRY_CAPTURE_BONUS*100)}% de capture</button>`}
     </div>
   `;
 }
@@ -1527,11 +2070,16 @@ function renderCaptureUI(mon){
 // Le coût d'évolution baisse légèrement avec le niveau (25 de base, -2 tous les 10 niveaux, plancher à 15).
 function evolutionCost(){ return Math.max(15, 25 - Math.floor(trainer.level / 10) * 2); }
 
-function renderOwnedActionsUI(){
+function renderOwnedActionsUI(mon){
+  const key = pokedex[mon.id] ? String(mon.id) : String(mon.id) + '-shiny';
+  const isCompanion = trainer.companionId === key;
   return `
     <div class="btn-row">
       <button class="gold-btn" id="evolve-btn">🍬 Évoluer (${trainer.candies||0}/${evolutionCost()} bonbons)</button>
       <button class="secondary" id="share-btn">📤 Partager</button>
+    </div>
+    <div class="btn-row">
+      <button class="secondary" id="companion-btn" ${isCompanion ? 'disabled' : ''}>${isCompanion ? '🐾 Compagnon actuel' : '🐾 Définir comme compagnon'}</button>
     </div>
   `;
 }
@@ -1579,8 +2127,9 @@ function attemptCapture(mon){
   trainer.balls[ballKey] -= 1;
   renderBalls();
 
-  const chance = computeCaptureChance(mon, zone, ballKey, isRaid);
+  const chance = withBerryBonus(computeCaptureChance(mon, zone, ballKey, isRaid));
   const success = Math.random() < chance;
+  trainer._berryActive = false; // la baie ne s'applique qu'à ce seul lancer
 
   // Animation de lancer : secousse puis résultat après un court délai
   const img = document.getElementById('encounter-img');
@@ -1601,6 +2150,7 @@ function resolveCaptureSuccess(mon, wasPerfect){
   const key = mon.id + (shiny ? '-shiny' : '');
   const isNew = !pokedex[key];
   const bigCatch = mon.isLegendary || shiny || wasRaid;
+  if (wasPerfect) trainer._perfectThrows = (trainer._perfectThrows || 0) + 1;
   if (isNew){
     pokedex[key] = { ...mon, isShiny: shiny, date: new Date().toLocaleDateString('fr-FR') };
     renderPokedex();
@@ -1610,18 +2160,21 @@ function resolveCaptureSuccess(mon, wasPerfect){
     showToast(label, bigCatch ? 'gold' : 'green');
     if (bigCatch) fireConfetti(mon.isLegendary && shiny);
   } else {
-    trainer.candies = (trainer.candies || 0) + (wasRaid ? 5 : 1);
+    addCandies(wasRaid ? 5 : 1);
     renderCandies();
     addXP(wasRaid ? 60 : (mon.isLegendary ? 30 : 10));
     showToast('🍬 Doublon ! ' + mon.name + ' converti en bonbon' + (wasRaid ? ' (+5, bonus Raid).' : ' (+1).'), 'green');
   }
   if (wasRaid){
-    trainer.candies = (trainer.candies || 0) + 10;
+    addCandies(10);
     trainer._raidWins = (trainer._raidWins || 0) + 1;
     renderCandies();
     showToast('⚔️ Raid vaincu ! +10 bonbons bonus.', 'gold');
+    updateWeeklyQuestOnRaidWin();
   }
+  trainer.captureCombo = (trainer.captureCombo || 0) + 1;
   updateQuestsOnCatch(mon);
+  updateWeeklyQuestOnCatch();
   checkAchievements();
   checkTypeBadges();
   saveAll();
@@ -1636,6 +2189,7 @@ function resolveCaptureSuccess(mon, wasPerfect){
 
 function resolveCaptureFail(mon){
   soundFail();
+  trainer.captureCombo = 0;
   showToast('💨 ' + mon.name + " s'est échappé !");
   const img = document.getElementById('encounter-img');
   if (img) img.classList.remove('throwing');
@@ -1654,6 +2208,7 @@ function endEncounter(mon){
   cancelAnimationFrame(captureTimer);
   currentEncounter = null;
   currentEncounterRaid = false;
+  trainer.captureCombo = 0;
   setRadarPaused(false);
   updatePokemonHintMarker();
   document.getElementById('pokemon-area').innerHTML = '<p class="hint">Vous laissez ' + mon.name + ' repartir. Continuez à marcher !</p>';
@@ -1710,6 +2265,7 @@ async function tryEvolve(mon){
     const wasNew = !pokedex[evolvedMon.id];
     pokedex[evolvedMon.id] = { ...evolvedMon, date: new Date().toLocaleDateString('fr-FR') };
     trainer._hasEvolved = true;
+    trainer._evolveCount = (trainer._evolveCount || 0) + 1;
     saveAll();
     renderPokedex();
     addXP(60);
@@ -2002,6 +2558,11 @@ function processDistance(dist, isTest){
   grantBallsForDistance(dist);
   updateDailyStats(dist);
   updateQuestsOnWalk(dist);
+  updateWeeklyQuestOnWalk(dist);
+  applyCompanionBonus(dist);
+  maybeFindBerry(dist);
+  renderStreakCalendar();
+  renderProgressChart();
   advanceSimulatedPosition(dist); // fait avancer la carte même sans GPS réel (mode test / permission refusée)
   checkAchievements();
 
