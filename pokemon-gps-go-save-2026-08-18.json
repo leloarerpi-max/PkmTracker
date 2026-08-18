@@ -1,0 +1,104 @@
+{
+  "myPokedex": {
+    "222": {
+      "id": 222,
+      "name": "Corayon",
+      "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/222.png",
+      "shinyImage": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/222.png",
+      "thumb": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/222.png",
+      "description": "On en trouve beaucoup dans les mers claires du sud. On dirait qu’il ne peut pas vivre en eau polluée.",
+      "types": [
+        "water",
+        "rock"
+      ],
+      "captureRate": 60,
+      "evolutionChainUrl": "https://pokeapi.co/api/v2/evolution-chain/113/",
+      "speciesName": "corsola",
+      "isLegendary": false,
+      "isShiny": false,
+      "date": "18/08/2026"
+    }
+  },
+  "pokeApiCache": {
+    "222": {
+      "id": 222,
+      "name": "Corayon",
+      "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/222.png",
+      "shinyImage": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/222.png",
+      "thumb": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/222.png",
+      "description": "On en trouve beaucoup dans les mers claires du sud. On dirait qu’il ne peut pas vivre en eau polluée.",
+      "types": [
+        "water",
+        "rock"
+      ],
+      "captureRate": 60,
+      "evolutionChainUrl": "https://pokeapi.co/api/v2/evolution-chain/113/",
+      "speciesName": "corsola",
+      "isLegendary": false
+    }
+  },
+  "trainerState": {
+    "xp": 70,
+    "level": 1,
+    "candies": 0,
+    "balls": {
+      "poke": 5,
+      "great": 0,
+      "ultra": 0
+    },
+    "selectedBall": "poke",
+    "incense": {
+      "count": 1,
+      "activeUntil": 0
+    },
+    "dailyKm": {
+      "2026-08-18": 3.9966690887538068
+    },
+    "streak": {
+      "count": 1,
+      "lastDate": "2026-08-18"
+    },
+    "quests": {
+      "date": "2026-08-18",
+      "list": [
+        {
+          "id": "walk",
+          "type": "walk_km",
+          "target": 3,
+          "progress": 3.8514616451602337,
+          "done": true,
+          "reward": {
+            "xp": 30,
+            "balls": 1
+          }
+        },
+        {
+          "id": "catch",
+          "type": "catch_n",
+          "target": 2,
+          "progress": 1,
+          "done": false,
+          "reward": {
+            "xp": 40,
+            "balls": 2
+          }
+        },
+        {
+          "id": "type",
+          "type": "catch_type",
+          "typeTarget": "ghost",
+          "target": 1,
+          "progress": 0,
+          "done": false,
+          "reward": {
+            "xp": 35,
+            "balls": 1
+          }
+        }
+      ]
+    },
+    "_ballProgress": 0.996669088753807
+  },
+  "exportedAt": "2026-08-18T05:41:09.208Z",
+  "gameVersion": 1
+}
