@@ -2666,13 +2666,16 @@ function processDistance(dist, isTest){
    ÉCRAN TOUJOURS ALLUMÉ (Wake Lock)
 ========================================================= */
 let wakeLockSentinel = null;
+let wakeLockGranted = false;
 async function requestWakeLock(){
   if (!('wakeLock' in navigator)) return;
   try{
     wakeLockSentinel = await navigator.wakeLock.request('screen');
-    wakeLockSentinel.addEventListener('release', () => { wakeLockSentinel = null; });
+    wakeLockGranted = true;
+    wakeLockSentinel.addEventListener('release', () => { wakeLockSentinel = null; wakeLockGranted = false; });
   }catch(e){
-    // Refusé par le navigateur (batterie faible, onglet non actif, etc.) : rien de grave, on retentera.
+    // Refusé par le navigateur (pas d'interaction utilisateur encore sur Safari iOS, batterie faible,
+    // onglet non actif, etc.) : rien de grave, on retentera au premier tap et à chaque retour au premier plan.
   }
 }
 // Le verrou est automatiquement relâché par le navigateur dès que l'onglet passe en arrière-plan ;
@@ -2680,7 +2683,18 @@ async function requestWakeLock(){
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') requestWakeLock();
 });
-requestWakeLock();
+requestWakeLock(); // tentative immédiate (suffisant sur la plupart des navigateurs Android/desktop)
+
+// Safari sur iPhone EXIGE une interaction utilisateur explicite avant d'autoriser le Wake Lock : une
+// demande faite uniquement au chargement de la page (sans tap) y est refusée silencieusement, ce qui
+// laissait l'écran se verrouiller normalement malgré la tentative ci-dessus. On retente donc dès le
+// tout premier tap n'importe où sur la page.
+function retryWakeLockOnGesture(){
+  if (!wakeLockGranted) requestWakeLock();
+}
+document.addEventListener('click', retryWakeLockOnGesture);
+document.addEventListener('touchend', retryWakeLockOnGesture);
+
 if (!('wakeLock' in navigator)){
   setTimeout(() => showToast("💡 Astuce : ton navigateur ne permet pas de garder l'écran allumé automatiquement. Augmente le délai de verrouillage de ton téléphone pendant que tu joues.", 'gold'), 2500);
 }
