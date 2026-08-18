@@ -1,0 +1,18 @@
+{
+  "name": "Pokémon GPS Go",
+  "short_name": "GPS Go",
+  "description": "Explorez, marchez, attrapez-les tous.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#141a29",
+  "theme_color": "#141a29",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23fff' stroke='%23141a29' stroke-width='4'/%3E%3Cpath d='M4 50a46 46 0 0 1 92 0Z' fill='%23ef4d5e' stroke='%23141a29' stroke-width='4'/%3E%3Crect x='4' y='46' width='92' height='8' fill='%23141a29'/%3E%3Ccircle cx='50' cy='50' r='14' fill='%23fff' stroke='%23141a29' stroke-width='5'/%3E%3C/svg%3E",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
