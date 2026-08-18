@@ -457,6 +457,7 @@
   </div>
 
   <div class="settings-row">
+    <button class="secondary" id="add-distance-btn" type="button">🚶 Ajouter une distance</button>
     <button class="secondary" id="export-btn" type="button">💾 Exporter ma sauvegarde</button>
     <button class="secondary" id="import-btn" type="button">📥 Importer</button>
     <button class="secondary danger" id="reset-btn" type="button">🗑️ Réinitialiser</button>
@@ -575,6 +576,7 @@ let needlePos = 0, needleDir = 1;
 let currentWeather = null; // {label, emoji, types:[...]}
 
 const RADAR_CIRC = 201;
+const MAX_MANUAL_DISTANCE_KM = 50; // garde-fou contre une saisie absurde (ex: virgule mal placée) pour l'ajout manuel de distance
 
 const LEGENDARY_IDS = new Set([
   144,145,146,150,151,
@@ -1133,6 +1135,7 @@ document.getElementById('theme-chip').addEventListener('click', toggleLightMode)
 document.getElementById('pokedex-search').addEventListener('input', renderPokedex);
 document.getElementById('pokedex-filter-type').addEventListener('change', renderPokedex);
 
+document.getElementById('add-distance-btn').addEventListener('click', promptManualDistance);
 document.getElementById('export-btn').addEventListener('click', exportSave);
 document.getElementById('import-btn').addEventListener('click', () => document.getElementById('import-file').click());
 document.getElementById('import-file').addEventListener('change', importSave);
@@ -1407,6 +1410,48 @@ function activateIncense(){
 /* =========================================================
    EXPORT / IMPORT DE SAUVEGARDE
 ========================================================= */
+/* =========================================================
+   AJOUT MANUEL DE DISTANCE (rattrapage GPS coupé, ou synchro via Raccourci Apple Santé)
+========================================================= */
+
+function applyManualDistanceKm(km, source){
+  const value = parseFloat(km);
+  if (!isFinite(value) || value <= 0){
+    showToast('⚠️ Distance invalide.');
+    return false;
+  }
+  if (value > MAX_MANUAL_DISTANCE_KM){
+    showToast('⚠️ Distance trop grande (max ' + MAX_MANUAL_DISTANCE_KM + ' km par ajout).');
+    return false;
+  }
+  processDistance(value, false);
+  const label = source === 'shortcut' ? '📱 depuis Apple Santé' : 'manuellement';
+  showToast('🚶 +' + value.toFixed(2) + ' km ajoutés ' + label + ' !', 'green');
+  return true;
+}
+
+function promptManualDistance(){
+  const input = window.prompt('Combien de km veux-tu ajouter (marche non trackée, téléphone verrouillé, etc.) ?', '');
+  if (input === null) return; // annulé
+  applyManualDistanceKm(input.replace(',', '.'), 'manual');
+}
+
+// Permet à un Raccourci Apple (qui lit la distance de marche dans Santé) d'ajouter la distance
+// simplement en ouvrant l'URL du jeu avec ?addKm=X.XX — aucune app tierce, aucun serveur requis.
+function checkManualDistanceFromURL(){
+  try{
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('addKm')){
+      const applied = applyManualDistanceKm(params.get('addKm'), 'shortcut');
+      if (applied){
+        // Nettoie l'URL pour éviter de ré-appliquer la même distance à un rechargement ultérieur.
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+    }
+  }catch(e){ /* URLSearchParams indisponible ou navigateur très ancien : on ignore silencieusement */ }
+}
+
 function exportSave(){
   const payload = {
     myPokedex: pokedex, pokeApiCache: apiCache, trainerState: trainer,
@@ -2770,6 +2815,10 @@ if ('serviceWorker' in navigator){
     });
   });
 }
+
+// Placé en tout dernier, une fois que TOUT le script (toutes les variables let/const) a fini de s'initialiser,
+// pour éviter les erreurs "Cannot access before initialization" que ça a causées plus tôt en le plaçant trop tôt.
+checkManualDistanceFromURL(); // récupère une distance envoyée via un Raccourci Apple (?addKm=X.XX), si présente
 </script>
 
 </body>
