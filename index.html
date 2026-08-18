@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -8,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
   :root{
     --bg-deep:#141a29;
@@ -37,183 +38,209 @@
   }
   .pixel{ font-family:'Press Start 2P', monospace; }
 
-.card{
-background:var(–bg-card); max-width:460px; margin:0 auto;
-border-radius:var(–radius); padding:22px 20px 26px;
-border:1px solid var(–line);
-box-shadow:0 25px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.03);
-position:relative; overflow:hidden;
-}
-.card::before{
-content:””; position:absolute; top:-60px; right:-60px; width:180px; height:180px;
-background:radial-gradient(circle, rgba(239,77,94,0.18), transparent 70%);
-pointer-events:none;
-}
+  .card{
+    background:var(--bg-card); max-width:460px; margin:0 auto;
+    border-radius:var(--radius); padding:22px 20px 26px;
+    border:1px solid var(--line);
+    box-shadow:0 25px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.03);
+    position:relative; overflow:hidden;
+  }
+  .card::before{
+    content:""; position:absolute; top:-60px; right:-60px; width:180px; height:180px;
+    background:radial-gradient(circle, rgba(239,77,94,0.18), transparent 70%);
+    pointer-events:none;
+  }
 
-header.top{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.brand{ display:flex; align-items:center; gap:10px; }
-.ball-logo{ width:30px; height:30px; flex:none; }
-h1{ font-size:1.05em; margin:0; letter-spacing:0.5px; }
-.sub{ color:var(–ink-dim); font-size:0.72em; margin-top:2px; }
+  header.top{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .ball-logo{ width:30px; height:30px; flex:none; }
+  h1{ font-size:1.05em; margin:0; letter-spacing:0.5px; }
+  .sub{ color:var(--ink-dim); font-size:0.72em; margin-top:2px; }
 
-.meta-row{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
-.chip{ display:flex; align-items:center; gap:6px; background:var(–bg-panel);
-border:1px solid var(–line); padding:6px 10px; border-radius:14px; font-size:0.8em; font-weight:600; }
-.chip svg{ width:16px; height:16px; }
+  .meta-row{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .chip{ display:flex; align-items:center; gap:6px; background:var(--bg-panel);
+    border:1px solid var(--line); padding:6px 10px; border-radius:14px; font-size:0.8em; font-weight:600; }
+  .chip svg{ width:16px; height:16px; }
 
-/* Trainer / XP */
-.trainer-row{ margin-top:16px; }
-.trainer-row .labels{ display:flex; justify-content:space-between; font-size:0.72em; color:var(–ink-dim); margin-bottom:5px; }
-.xp-track{ height:8px; border-radius:6px; background:var(–bg-panel); overflow:hidden; border:1px solid var(–line);}
-.xp-fill{ height:100%; width:0%; background:linear-gradient(90deg,#6ee7ff,#7c8cff); transition:width .5s ease; }
+  /* Trainer / XP */
+  .trainer-row{ margin-top:16px; }
+  .trainer-row .labels{ display:flex; justify-content:space-between; font-size:0.72em; color:var(--ink-dim); margin-bottom:5px; }
+  .xp-track{ height:8px; border-radius:6px; background:var(--bg-panel); overflow:hidden; border:1px solid var(--line);}
+  .xp-fill{ height:100%; width:0%; background:linear-gradient(90deg,#6ee7ff,#7c8cff); transition:width .5s ease; }
 
-/* Distance / radar */
-.radar-wrap{ display:flex; align-items:center; gap:16px; margin-top:18px; background:var(–bg-panel);
-border:1px solid var(–line); border-radius:16px; padding:14px 16px; transition:opacity .3s ease; }
-.radar-wrap.paused{ opacity:0.5; }
-.radar-paused-note{ font-size:0.72em; color:var(–gold); font-weight:700; margin-top:4px; display:none; }
-.radar-paused-note.show{ display:block; }
-.radar{ position:relative; width:76px; height:76px; flex:none; }
-.radar svg{ transform:rotate(-90deg); }
-.radar .center{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
-.radar .center span{ font-size:1.3em; }
-.radar-text{ flex:1; }
-.km-big{ font-size:1.55em; font-weight:800; line-height:1; }
-.km-unit{ font-size:0.6em; color:var(–ink-dim); font-weight:600; }
-.target-line{ margin-top:6px; font-size:0.78em; color:var(–ink-dim); }
-.target-line b{ color:var(–ink); }
+  /* Distance / radar */
+  .radar-wrap{ display:flex; align-items:center; gap:16px; margin-top:18px; background:var(--bg-panel);
+    border:1px solid var(--line); border-radius:16px; padding:14px 16px; transition:opacity .3s ease; }
+  .radar-wrap.paused{ opacity:0.5; }
+  .radar-paused-note{ font-size:0.72em; color:var(--gold); font-weight:700; margin-top:4px; display:none; }
+  .radar-paused-note.show{ display:block; }
+  .radar{ position:relative; width:76px; height:76px; flex:none; }
+  .radar svg{ transform:rotate(-90deg); }
+  .radar .center{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .radar .center span{ font-size:1.3em; }
+  .radar-text{ flex:1; }
+  .km-big{ font-size:1.55em; font-weight:800; line-height:1; }
+  .km-unit{ font-size:0.6em; color:var(--ink-dim); font-weight:600; }
+  .target-line{ margin-top:6px; font-size:0.78em; color:var(--ink-dim); }
+  .target-line b{ color:var(--ink); }
 
-#status{ font-size:0.75em; color:var(–ink-dim); text-align:center; margin-top:10px; min-height:1.2em; }
+  #status{ font-size:0.75em; color:var(--ink-dim); text-align:center; margin-top:10px; min-height:1.2em; }
 
-.test-btn{ display:block; margin:6px auto 0; background:transparent; border:1px dashed var(–line);
-color:var(–ink-dim); font-size:0.72em; padding:6px 12px; border-radius:10px; cursor:pointer; }
-.test-btn:hover{ color:var(–ink); border-color:var(–blue); }
+  .test-btn{ display:block; margin:6px auto 0; background:transparent; border:1px dashed var(--line);
+    color:var(--ink-dim); font-size:0.72em; padding:6px 12px; border-radius:10px; cursor:pointer; }
+  .test-btn:hover{ color:var(--ink); border-color:var(--blue); }
 
-/* Quests */
-.quests{ margin-top:16px; background:var(–bg-panel); border:1px solid var(–line); border-radius:16px; padding:12px 14px; }
-.quests h3{ font-size:0.82em; margin:0 0 8px; display:flex; align-items:center; gap:6px; }
-.quest-item{ display:flex; align-items:center; gap:8px; padding:6px 0; font-size:0.78em; }
-.quest-item.done{ color:var(–green); }
-.quest-check{ width:18px; height:18px; border-radius:50%; border:2px solid var(–line); flex:none;
-display:flex; align-items:center; justify-content:center; font-size:0.7em; }
-.quest-item.done .quest-check{ border-color:var(–green); background:var(–green); color:#0e1526; }
-.quest-track{ flex:1; }
-.quest-bar{ height:5px; background:#0e1526; border-radius:4px; overflow:hidden; margin-top:3px; }
-.quest-bar-fill{ height:100%; background:var(–blue); }
-.quest-reward{ font-size:0.7em; color:var(–ink-dim); white-space:nowrap; }
+  /* Quests */
+  .quests{ margin-top:16px; background:var(--bg-panel); border:1px solid var(--line); border-radius:16px; padding:12px 14px; }
+  .quests h3{ font-size:0.82em; margin:0 0 8px; display:flex; align-items:center; gap:6px; }
+  .quest-item{ display:flex; align-items:center; gap:8px; padding:6px 0; font-size:0.78em; }
+  .quest-item.done{ color:var(--green); }
+  .quest-check{ width:18px; height:18px; border-radius:50%; border:2px solid var(--line); flex:none;
+    display:flex; align-items:center; justify-content:center; font-size:0.7em; }
+  .quest-item.done .quest-check{ border-color:var(--green); background:var(--green); color:#0e1526; }
+  .quest-track{ flex:1; }
+  .quest-bar{ height:5px; background:#0e1526; border-radius:4px; overflow:hidden; margin-top:3px; }
+  .quest-bar-fill{ height:100%; background:var(--blue); }
+  .quest-reward{ font-size:0.7em; color:var(--ink-dim); white-space:nowrap; }
 
-/* Stats */
-.stats-row{ display:flex; gap:8px; margin-top:12px; }
-.stat-box{ flex:1; background:var(–bg-panel); border:1px solid var(–line); border-radius:14px; padding:9px; text-align:center; }
-.stat-box .val{ font-weight:800; font-size:0.95em; }
-.stat-box .lbl{ font-size:0.65em; color:var(–ink-dim); margin-top:2px; }
+  /* Stats */
+  .stats-row{ display:flex; gap:8px; margin-top:12px; }
+  .stat-box{ flex:1; background:var(--bg-panel); border:1px solid var(--line); border-radius:14px; padding:9px; text-align:center; }
+  .stat-box .val{ font-weight:800; font-size:0.95em; }
+  .stat-box .lbl{ font-size:0.65em; color:var(--ink-dim); margin-top:2px; }
 
-/* Encounter / capture panel */
-.stage{ margin-top:16px; background:var(–bg-panel); border:1px solid var(–line); border-radius:18px;
-padding:18px; text-align:center; min-height:120px; scroll-margin-top:16px; transition:box-shadow .3s ease, border-color .3s ease; }
-.stage.alert{ border-color:var(–gold); animation:stageAlert 0.7s ease-in-out 3; }
-@keyframes stageAlert{
-0%,100%{ box-shadow:0 0 0 0 rgba(255,205,60,0); }
-50%{ box-shadow:0 0 0 6px rgba(255,205,60,0.35), 0 0 32px rgba(255,205,60,0.45); }
-}
-.stage .hint{ color:var(–ink-dim); font-size:0.9em; }
-.pokedex-num{ font-size:0.72em; color:var(–ink-dim); font-weight:700; letter-spacing:1px; }
-.poke-name{ margin:4px 0 8px; font-size:1.15em; font-weight:800; letter-spacing:0.3px; }
-.poke-name.legendary{ background:linear-gradient(90deg,#ffcd3c,#ff9d4d,#ffcd3c);
--webkit-background-clip:text; background-clip:text; color:transparent; }
-.poke-img-wrap{ position:relative; display:inline-block; }
-img.pokemon-img{ width:150px; height:150px; object-fit:contain; filter:drop-shadow(0 10px 14px rgba(0,0,0,0.4));
-animation:breathe 3s ease-in-out infinite; }
-@keyframes breathe{ 0%,100%{ transform:scale(1) translateY(0);} 50%{ transform:scale(1.035) translateY(-3px);} }
-img.pokemon-img.throwing{ animation:shake 0.5s ease-in-out; }
-@keyframes shake{ 0%,100%{ transform:translateX(0) rotate(0);} 20%{ transform:translateX(-6px) rotate(-4deg);}
-40%{ transform:translateX(6px) rotate(4deg);} 60%{ transform:translateX(-4px) rotate(-2deg);} 80%{ transform:translateX(4px) rotate(2deg);} }
-img.pokemon-img.captured-pop{ animation:pop 0.5s ease; }
-@keyframes pop{ 0%{ transform:scale(0.2); opacity:0;} 60%{ transform:scale(1.15); opacity:1;} 100%{ transform:scale(1); } }
-.shiny-badge{ position:absolute; top:-4px; right:6px; font-size:1.3em; animation:sparkle 1.6s ease-in-out infinite; filter:drop-shadow(0 0 6px var(–gold)); }
-@keyframes sparkle{ 0%,100%{ opacity:0.6; transform:scale(0.9) rotate(-8deg);} 50%{ opacity:1; transform:scale(1.15) rotate(8deg);} }
-.poke-name.shiny{ color:var(–gold); }
-.legend-ring{ position:absolute; inset:0; margin:auto; width:170px; height:170px;
-border-radius:50%; border:2px dashed var(–gold); animation:spin 8s linear infinite; opacity:0.7; }
-@keyframes spin{ to{ transform:rotate(360deg);} }
-#confetti-canvas{ position:fixed; inset:0; width:100vw; height:100vh; pointer-events:none; z-index:60; }
-.types-row{ display:flex; gap:6px; justify-content:center; margin-top:6px; flex-wrap:wrap; }
-.type-chip{ font-size:0.68em; font-weight:700; color:#fff; padding:3px 9px; border-radius:999px; text-shadow:0 1px 1px rgba(0,0,0,0.25); }
-.flavor-text{ font-style:italic; color:var(–ink-dim); font-size:0.82em; margin-top:10px; line-height:1.4; }
+  /* Encounter / capture panel */
+  .stage{ margin-top:16px; background:var(--bg-panel); border:1px solid var(--line); border-radius:18px;
+    padding:18px; text-align:center; min-height:120px; scroll-margin-top:16px; transition:box-shadow .3s ease, border-color .3s ease; }
+  .stage.alert{ border-color:var(--gold); animation:stageAlert 0.7s ease-in-out 3; }
+  @keyframes stageAlert{
+    0%,100%{ box-shadow:0 0 0 0 rgba(255,205,60,0); }
+    50%{ box-shadow:0 0 0 6px rgba(255,205,60,0.35), 0 0 32px rgba(255,205,60,0.45); }
+  }
+  .stage .hint{ color:var(--ink-dim); font-size:0.9em; }
+  .pokedex-num{ font-size:0.72em; color:var(--ink-dim); font-weight:700; letter-spacing:1px; }
+  .poke-name{ margin:4px 0 8px; font-size:1.15em; font-weight:800; letter-spacing:0.3px; }
+  .poke-name.legendary{ background:linear-gradient(90deg,#ffcd3c,#ff9d4d,#ffcd3c);
+    -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .poke-img-wrap{ position:relative; display:inline-block; }
+  img.pokemon-img{ width:150px; height:150px; object-fit:contain; filter:drop-shadow(0 10px 14px rgba(0,0,0,0.4));
+    animation:breathe 3s ease-in-out infinite; }
+  @keyframes breathe{ 0%,100%{ transform:scale(1) translateY(0);} 50%{ transform:scale(1.035) translateY(-3px);} }
+  img.pokemon-img.throwing{ animation:shake 0.5s ease-in-out; }
+  @keyframes shake{ 0%,100%{ transform:translateX(0) rotate(0);} 20%{ transform:translateX(-6px) rotate(-4deg);}
+    40%{ transform:translateX(6px) rotate(4deg);} 60%{ transform:translateX(-4px) rotate(-2deg);} 80%{ transform:translateX(4px) rotate(2deg);} }
+  img.pokemon-img.captured-pop{ animation:pop 0.5s ease; }
+  @keyframes pop{ 0%{ transform:scale(0.2); opacity:0;} 60%{ transform:scale(1.15); opacity:1;} 100%{ transform:scale(1); } }
+  .shiny-badge{ position:absolute; top:-4px; right:6px; font-size:1.3em; animation:sparkle 1.6s ease-in-out infinite; filter:drop-shadow(0 0 6px var(--gold)); }
+  @keyframes sparkle{ 0%,100%{ opacity:0.6; transform:scale(0.9) rotate(-8deg);} 50%{ opacity:1; transform:scale(1.15) rotate(8deg);} }
+  .poke-name.shiny{ color:var(--gold); }
+  .legend-ring{ position:absolute; inset:0; margin:auto; width:170px; height:170px;
+    border-radius:50%; border:2px dashed var(--gold); animation:spin 8s linear infinite; opacity:0.7; }
+  @keyframes spin{ to{ transform:rotate(360deg);} }
+  #confetti-canvas{ position:fixed; inset:0; width:100vw; height:100vh; pointer-events:none; z-index:60; }
+  .types-row{ display:flex; gap:6px; justify-content:center; margin-top:6px; flex-wrap:wrap; }
+  .type-chip{ font-size:0.68em; font-weight:700; color:#fff; padding:3px 9px; border-radius:999px; text-shadow:0 1px 1px rgba(0,0,0,0.25); }
+  .flavor-text{ font-style:italic; color:var(--ink-dim); font-size:0.82em; margin-top:10px; line-height:1.4; }
 
-.egg-wrap{ margin:6px 0; }
-.egg-emoji{ font-size:3.2em; display:inline-block; animation:eggbounce 1.4s ease-in-out infinite; }
-@keyframes eggbounce{ 0%,100%{ transform:translateY(0) rotate(-3deg);} 50%{ transform:translateY(-8px) rotate(3deg);} }
+  .egg-wrap{ margin:6px 0; }
+  .egg-emoji{ font-size:3.2em; display:inline-block; animation:eggbounce 1.4s ease-in-out infinite; }
+  @keyframes eggbounce{ 0%,100%{ transform:translateY(0) rotate(-3deg);} 50%{ transform:translateY(-8px) rotate(3deg);} }
 
-.catch-zone{ margin-top:14px; }
-.catch-rate{ font-size:0.72em; color:var(–ink-dim); margin-bottom:8px; }
-.bar-outer{ position:relative; height:26px; background:#0e1526; border-radius:13px; border:1px solid var(–line); overflow:hidden; }
-.bar-sweet{ position:absolute; top:0; bottom:0; background:rgba(79,216,138,0.35); border-left:2px solid var(–green); border-right:2px solid var(–green); }
-.bar-perfect{ position:absolute; top:0; bottom:0; background:rgba(255,205,60,0.55); border-left:2px solid var(–gold); border-right:2px solid var(–gold); }
-.bar-needle{ position:absolute; top:0; bottom:0; width:4px; background:var(–red); border-radius:2px; box-shadow:0 0 8px var(–red); }
+  .catch-zone{ margin-top:14px; }
+  .catch-rate{ font-size:0.72em; color:var(--ink-dim); margin-bottom:8px; }
+  .bar-outer{ position:relative; height:26px; background:#0e1526; border-radius:13px; border:1px solid var(--line); overflow:hidden; }
+  .bar-sweet{ position:absolute; top:0; bottom:0; background:rgba(79,216,138,0.35); border-left:2px solid var(--green); border-right:2px solid var(--green); }
+  .bar-perfect{ position:absolute; top:0; bottom:0; background:rgba(255,205,60,0.55); border-left:2px solid var(--gold); border-right:2px solid var(--gold); }
+  .bar-needle{ position:absolute; top:0; bottom:0; width:4px; background:var(--red); border-radius:2px; box-shadow:0 0 8px var(--red); }
 
-.ball-select-row{ display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
-.ball-opt{ flex:1; min-width:80px; background:var(–bg-card); border:1px solid var(–line); border-radius:12px;
-padding:7px 6px; text-align:center; font-size:0.7em; font-weight:700; cursor:pointer; color:var(–ink-dim); }
-.ball-opt.selected{ border-color:var(–blue); color:var(–ink); box-shadow:0 0 0 1px var(–blue) inset; }
-.ball-opt:disabled, .ball-opt.locked{ opacity:0.35; cursor:not-allowed; }
-.ball-opt .n{ display:block; font-size:1.1em; }
+  .ball-select-row{ display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
+  .ball-opt{ flex:1; min-width:80px; background:var(--bg-card); border:1px solid var(--line); border-radius:12px;
+    padding:7px 6px; text-align:center; font-size:0.7em; font-weight:700; cursor:pointer; color:var(--ink-dim); }
+  .ball-opt.selected{ border-color:var(--blue); color:var(--ink); box-shadow:0 0 0 1px var(--blue) inset; }
+  .ball-opt:disabled, .ball-opt.locked{ opacity:0.35; cursor:not-allowed; }
+  .ball-opt .n{ display:block; font-size:1.1em; }
 
-.btn-row{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
-button{ font-family:‘Poppins’, sans-serif; font-weight:700; border:none; border-radius:12px; padding:11px 14px;
-cursor:pointer; font-size:0.85em; flex:1; transition:transform .12s ease, filter .12s ease; }
-button:active{ transform:scale(0.96); }
-button.primary{ background:linear-gradient(180deg,var(–red),var(–red-dark)); color:#fff; box-shadow:0 6px 14px rgba(239,77,94,0.35); }
-button.secondary{ background:var(–bg-card); color:var(–ink-dim); border:1px solid var(–line); flex:0 0 auto; padding:11px 16px; }
-button.gold-btn{ background:linear-gradient(180deg,var(–gold),#e0a80f); color:#2a1d00; flex:0 0 auto; padding:11px 16px; }
-button:disabled{ opacity:0.45; cursor:not-allowed; filter:grayscale(0.3); }
+  .btn-row{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+  button{ font-family:'Poppins', sans-serif; font-weight:700; border:none; border-radius:12px; padding:11px 14px;
+    cursor:pointer; font-size:0.85em; flex:1; transition:transform .12s ease, filter .12s ease; }
+  button:active{ transform:scale(0.96); }
+  button.primary{ background:linear-gradient(180deg,var(--red),var(--red-dark)); color:#fff; box-shadow:0 6px 14px rgba(239,77,94,0.35); }
+  button.secondary{ background:var(--bg-card); color:var(--ink-dim); border:1px solid var(--line); flex:0 0 auto; padding:11px 16px; }
+  button.gold-btn{ background:linear-gradient(180deg,var(--gold),#e0a80f); color:#2a1d00; flex:0 0 auto; padding:11px 16px; }
+  button:disabled{ opacity:0.45; cursor:not-allowed; filter:grayscale(0.3); }
+  button.no-balls{ opacity:0.55; filter:grayscale(0.25); }
+  @keyframes shakeBtn{ 0%,100%{ transform:translateX(0);} 20%{ transform:translateX(-5px);} 40%{ transform:translateX(5px);}
+    60%{ transform:translateX(-4px);} 80%{ transform:translateX(4px);} }
+  button.shake{ animation:shakeBtn 0.4s ease-in-out; }
 
-.toast{ position:fixed; left:50%; top:14px; transform:translate(-50%,-140%); z-index:50;
-background:var(–bg-card); border:1px solid var(–line); color:var(–ink); padding:10px 16px;
-border-radius:14px; font-size:0.82em; font-weight:600; box-shadow:0 10px 24px rgba(0,0,0,0.4);
-transition:transform .35s ease; display:flex; gap:8px; align-items:center; max-width:90vw; }
-.toast.show{ transform:translate(-50%,0); }
-.toast.gold{ border-color:var(–gold); }
-.toast.green{ border-color:var(–green); }
+  .out-of-balls-hint{ margin-top:10px; padding:9px 12px; background:rgba(239,77,94,0.16); border:1px solid var(--red);
+    border-radius:12px; color:var(--ink); font-size:0.8em; font-weight:700; text-align:center; }
 
-/* Pokedex grid */
-.pokedex-container{ margin-top:20px; border-top:1px dashed var(–line); padding-top:14px; }
-.pokedex-container h3{ font-size:0.85em; display:flex; align-items:center; gap:8px; margin:0 0 10px; }
-.count-badge{ background:var(–green); color:#0e1526; padding:2px 9px; border-radius:12px; font-size:0.85em; font-weight:800; }
-.pokedex-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(76px,1fr)); gap:8px;
-max-height:260px; overflow-y:auto; padding:10px; background:var(–bg-panel); border-radius:14px; border:1px solid var(–line); }
-.pokedex-item{ background:var(–bg-card); border-radius:10px; padding:6px; font-size:0.72em; cursor:pointer;
-border:1px solid var(–line); text-align:center; transition:transform .1s ease; }
-.pokedex-item:hover{ transform:translateY(-2px); border-color:var(–red); }
-.pokedex-item.legendary{ border-color:var(–gold); box-shadow:0 0 10px rgba(255,205,60,0.25); }
-.pokedex-item img{ width:48px; height:48px; }
-.pokedex-item strong{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.pokedex-item.shiny{ border-color:var(–gold); }
-.pokedex-empty{ grid-column:1/-1; color:var(–ink-dim); text-align:center; font-size:0.82em; padding:10px 0; }
+  .toast{ position:fixed; left:50%; top:max(70px, env(safe-area-inset-top, 0px) + 70px); transform:translate(-50%,-20px) scale(0.9); opacity:0; z-index:50;
+    background:var(--bg-card); border:2px solid var(--line); color:var(--ink); padding:13px 20px;
+    border-radius:14px; font-size:0.92em; font-weight:700; box-shadow:0 10px 28px rgba(0,0,0,0.55);
+    transition:transform .3s cubic-bezier(.34,1.56,.64,1), opacity .25s ease; display:flex; gap:8px; align-items:center; max-width:92vw; text-align:center; }
+  .toast.show{ transform:translate(-50%,0) scale(1); opacity:1; }
+  .toast.gold{ border-color:var(--gold); box-shadow:0 10px 28px rgba(0,0,0,0.55), 0 0 18px rgba(255,205,60,0.4); }
+  .toast.green{ border-color:var(--green); }
 
-.pokedex-tools{ display:flex; gap:6px; margin-bottom:8px; }
-.pokedex-tools input[type=“text”]{ flex:1; background:var(–bg-card); border:1px solid var(–line);
-color:var(–ink); border-radius:10px; padding:7px 10px; font-size:0.78em; font-family:‘Poppins’,sans-serif; }
-.pokedex-tools input[type=“text”]:focus{ outline:none; border-color:var(–blue); }
-.pokedex-tools select{ background:var(–bg-card); border:1px solid var(–line); color:var(–ink);
-border-radius:10px; padding:7px 8px; font-size:0.78em; font-family:‘Poppins’,sans-serif; }
+  .chip.pulse{ animation:chipPulse 0.8s ease; }
+  @keyframes chipPulse{
+    0%{ box-shadow:0 0 0 0 rgba(255,205,60,0.6); }
+    50%{ box-shadow:0 0 0 8px rgba(255,205,60,0); background:rgba(255,205,60,0.25); }
+    100%{ box-shadow:0 0 0 0 rgba(255,205,60,0); }
+  }
 
-.incense-chip{ cursor:pointer; }
-.incense-chip.active{ border-color:var(–gold); color:var(–gold); }
+  /* Pokedex grid */
+  .pokedex-container{ margin-top:20px; border-top:1px dashed var(--line); padding-top:14px; }
+  .pokedex-container h3{ font-size:0.85em; display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+  .count-badge{ background:var(--green); color:#0e1526; padding:2px 9px; border-radius:12px; font-size:0.85em; font-weight:800; }
+  .pokedex-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(76px,1fr)); gap:8px;
+    max-height:260px; overflow-y:auto; padding:10px; background:var(--bg-panel); border-radius:14px; border:1px solid var(--line); }
+  .pokedex-item{ background:var(--bg-card); border-radius:10px; padding:6px; font-size:0.72em; cursor:pointer;
+    border:1px solid var(--line); text-align:center; transition:transform .1s ease; }
+  .pokedex-item:hover{ transform:translateY(-2px); border-color:var(--red); }
+  .pokedex-item.legendary{ border-color:var(--gold); box-shadow:0 0 10px rgba(255,205,60,0.25); }
+  .pokedex-item img{ width:48px; height:48px; }
+  .pokedex-item strong{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pokedex-item.shiny{ border-color:var(--gold); }
+  .pokedex-empty{ grid-column:1/-1; color:var(--ink-dim); text-align:center; font-size:0.82em; padding:10px 0; }
 
-.settings-row{ display:flex; gap:8px; margin-top:12px; }
-.settings-row button{ font-size:0.7em; padding:8px 10px; }
-#import-file{ display:none; }
+  .pokedex-tools{ display:flex; gap:6px; margin-bottom:8px; }
+  .pokedex-tools input[type="text"]{ flex:1; background:var(--bg-card); border:1px solid var(--line);
+    color:var(--ink); border-radius:10px; padding:7px 10px; font-size:0.78em; font-family:'Poppins',sans-serif; }
+  .pokedex-tools input[type="text"]:focus{ outline:none; border-color:var(--blue); }
+  .pokedex-tools select{ background:var(--bg-card); border:1px solid var(--line); color:var(--ink);
+    border-radius:10px; padding:7px 8px; font-size:0.78em; font-family:'Poppins',sans-serif; }
 
-.streak-milestone{ font-size:0.62em; color:var(–gold); margin-left:2px; }
+  .incense-chip{ cursor:pointer; }
+  .incense-chip.active{ border-color:var(--gold); color:var(--gold); }
 
-.test-btn-row{ display:flex; gap:6px; justify-content:center; margin-top:6px; }
-.test-btn-row .test-btn{ margin:0; flex:0 0 auto; }
+  .settings-row{ display:flex; gap:8px; margin-top:12px; }
+  .settings-row button{ font-size:0.7em; padding:8px 10px; }
+  #import-file{ display:none; }
 
-::-webkit-scrollbar{ width:8px; }
-::-webkit-scrollbar-thumb{ background:var(–line); border-radius:8px; }
+  .streak-milestone{ font-size:0.62em; color:var(--gold); margin-left:2px; }
+
+  .test-btn-row{ display:flex; gap:6px; justify-content:center; margin-top:6px; }
+  .test-btn-row .test-btn{ margin:0; flex:0 0 auto; }
+
+  .map-section{ margin-top:16px; background:var(--bg-panel); border:1px solid var(--line); border-radius:16px; padding:12px 14px; }
+  .map-header{ display:flex; justify-content:space-between; align-items:center; }
+  .map-header h3{ font-size:0.85em; margin:0; display:flex; align-items:center; gap:6px; }
+  .map-toggle-btn{ background:var(--bg-card); color:var(--ink); border:1px solid var(--line); border-radius:10px;
+    padding:6px 12px; font-size:0.72em; font-weight:700; cursor:pointer; flex:0 0 auto; }
+  .map-toggle-btn:hover{ border-color:var(--blue); }
+  .leaflet-map-container{ width:100%; height:220px; border-radius:14px; overflow:hidden; border:1px solid var(--line);
+    margin-top:10px; background:var(--bg-card); }
+  .map-hint{ font-size:0.7em; color:var(--ink-dim); margin-top:8px; text-align:center; }
+  .map-poke-marker{ font-size:24px; text-align:center; line-height:1; filter:drop-shadow(0 2px 5px rgba(0,0,0,0.6)); }
+  .map-player-dot{ width:16px; height:16px; border-radius:50%; background:var(--blue); border:3px solid #fff;
+    box-shadow:0 0 0 4px rgba(110,231,255,0.3); }
+
+  ::-webkit-scrollbar{ width:8px; }
+  ::-webkit-scrollbar-thumb{ background:var(--line); border-radius:8px; }
 </style>
-
 </head>
 <body>
 
@@ -276,6 +303,15 @@ border-radius:10px; padding:7px 8px; font-size:0.78em; font-family:‘Poppins’
     <button class="test-btn" id="test-btn-250" type="button">🧪 +250 m</button>
     <button class="test-btn" id="test-btn-1000" type="button">🧪 +1 km</button>
     <button class="test-btn" id="test-btn-5000" type="button">🧪 +5 km</button>
+  </div>
+
+  <div class="map-section">
+    <div class="map-header">
+      <h3>🗺️ Carte</h3>
+      <button class="map-toggle-btn" id="map-toggle-btn" type="button">Afficher la carte</button>
+    </div>
+    <div class="leaflet-map-container" id="leaflet-map" style="display:none;"></div>
+    <p class="map-hint" id="map-hint">Le repère ❓ indique approximativement où se trouve la prochaine rencontre.</p>
   </div>
 
   <div class="quests" id="quests-panel">
@@ -347,6 +383,18 @@ const STREAK_MILESTONES = [7, 30, 100];
 
 let nextTarget = generateRandomDistance();
 
+/* --- Etat de la carte GPS --- */
+let leafletMap = null;
+let playerMarker = null;
+let pathLine = null;
+let pathCoords = [];
+let mapPosition = null;      // {lat, lon} affiché sur la carte (réel si GPS actif, sinon simulé)
+let usingRealGPS = false;
+let pokemonHintMarker = null;
+let hintBearing = null;
+const SIM_START = { lat: 48.8566, lon: 2.3522 }; // point de départ par défaut si pas de GPS réel (Paris)
+const SIM_HEADING_DEG = 47; // cap fixe pour une trajectoire simulée lisible en mode test
+
 let currentEncounter = null; // pokemon en cours de capture
 let currentEncounterShiny = false;
 let currentEgg = null;       // {mon, distanceNeeded, distanceWalked}
@@ -383,6 +431,7 @@ const TYPE_INFO = {
    INITIALISATION UI
 ========================================================= */
 document.getElementById('target-km').innerText = nextTarget.toFixed(1);
+resetHintBearing();
 ensureDailyQuests();
 updateStreak();
 renderPokedex();
@@ -438,7 +487,8 @@ function showToast(msg, kind){
   t.textContent = msg;
   t.className = 'toast show' + (kind ? ' ' + kind : '');
   clearTimeout(t._hideTimer);
-  t._hideTimer = setTimeout(() => { t.className = 'toast'; }, 2600);
+  const duration = kind === 'gold' ? 3800 : 2600;
+  t._hideTimer = setTimeout(() => { t.className = 'toast'; }, duration);
 }
 
 function vibrate(pattern){ if (navigator.vibrate) navigator.vibrate(pattern); }
@@ -663,6 +713,7 @@ function updateStreak(){
     trainer.incense.count = (trainer.incense.count || 0) + 1;
     showToast('🔥 Série de ' + trainer.streak.count + ' jours ! +1 Encens offert.', 'gold');
     fireConfetti(true);
+    pulseChip('incense-chip');
   }
   saveAll();
 }
@@ -729,11 +780,15 @@ function completeQuest(q){
   q.done = true;
   trainer.balls.poke = Math.min(10, trainer.balls.poke + (q.reward.balls || 0));
   let msg = '🏆 Défi complété : +' + (q.reward.xp||0) + ' XP' + (q.reward.balls ? ' +' + q.reward.balls + ' Poké Balls' : '');
+  let gotIncense = false;
   if (Math.random() < 0.3){
     trainer.incense.count = (trainer.incense.count || 0) + 1;
     msg += ' +1 Encens 🌸';
+    gotIncense = true;
   }
   showToast(msg, 'green');
+  if (q.reward.balls) pulseChip('ball-counter');
+  if (gotIncense) pulseChip('incense-chip');
   renderBalls();
   renderIncense();
   addXP(q.reward.xp || 0);
@@ -793,12 +848,26 @@ function renderQuests(){
 /* =========================================================
    POKÉ BALLS
 ========================================================= */
+function pulseChip(elementId){
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  el.classList.remove('pulse');
+  void el.offsetWidth; // relance l'animation même si elle vient de jouer
+  el.classList.add('pulse');
+  setTimeout(() => el.classList.remove('pulse'), 850);
+}
+
 function grantBallsForDistance(distanceWalkedKm){
   trainer._ballProgress = (trainer._ballProgress || 0) + distanceWalkedKm;
+  let granted = false;
   while (trainer._ballProgress >= 1 && trainer.balls.poke < 10){
     trainer._ballProgress -= 1;
     trainer.balls.poke += 1;
+    granted = true;
+  }
+  if (granted){
     showToast('🔴 Nouvelle Poké Ball obtenue !');
+    pulseChip('ball-counter');
   }
   renderBalls();
   saveAll();
@@ -891,21 +960,66 @@ function computeHatchDistance(mon){
   return parseFloat(base.toFixed(2));
 }
 
+let isSpawningEncounter = false; // verrou partagé (oeuf ET rencontre directe) contre les apparitions concurrentes
+
+const SHINY_CHANCE = 1/100;
+const EGG_CHANCE = 0.18; // ~18% de chance d'obtenir un Œuf plutôt qu'une rencontre directe
+
+function presentWildEncounter(mon){
+  currentEncounter = mon;
+  currentEncounterShiny = Math.random() < SHINY_CHANCE;
+  soundHatch();
+  vibrate([50,50,50,50,150]);
+  if (currentEncounterShiny) showToast('✨ Un scintillement... Pokémon chromatique en approche !', 'gold');
+  renderEncounter(mon, true);
+  announceEncounter(currentEncounterShiny ? '✨ Un Pokémon chromatique est apparu !' : '🐾 Un Pokémon sauvage est apparu !');
+}
+
+async function spawnDirectEncounter(){
+  if (isSpawningEncounter) return;
+  isSpawningEncounter = true;
+  document.getElementById('pokemon-area').innerHTML = '<p class="hint">Un bruissement dans les hautes herbes...</p>';
+  try{
+    const mon = await pickAndFetchBiasedMon();
+    // Si une autre rencontre/oeuf s'est déjà installé entre-temps, ce résultat est obsolète.
+    if (currentEncounter || currentEgg){ isSpawningEncounter = false; return; }
+    presentWildEncounter(mon);
+  }catch(err){
+    if (!currentEncounter && !currentEgg){
+      document.getElementById('pokemon-area').innerHTML = `
+        <p class="hint">Connexion impossible... le Pokémon s'est enfui avant que vous le voyiez.</p>
+        <button class="secondary" id="retry-direct-btn" style="margin-top:10px;">Réessayer</button>
+      `;
+      document.getElementById('retry-direct-btn')?.addEventListener('click', spawnDirectEncounter);
+    }
+  }finally{
+    isSpawningEncounter = false;
+  }
+}
+
 async function spawnEgg(){
+  if (isSpawningEncounter) return; // évite les apparitions concurrentes en cas de clics rapides
+  isSpawningEncounter = true;
   document.getElementById('pokemon-area').innerHTML = '<p class="hint">Vous sentez une présence... un Œuf est apparu !</p>';
-  announceEncounter('📍 Un Œuf est apparu ! Faites défiler pour le voir.');
+  announceEncounter('🥚 Un Œuf rare est apparu ! Faites défiler pour le voir.');
   try{
     const mon = await pickAndFetchBiasedMon();
     const distanceNeeded = computeHatchDistance(mon);
+    // Si une rencontre s'est ouverte entre-temps (ex: hatch déclenché ailleurs), on ignore ce résultat obsolète.
+    if (currentEncounter){ isSpawningEncounter = false; return; }
     currentEgg = { mon, distanceNeeded, distanceWalked: 0 };
     soundEgg(); vibrate(60);
     renderEggUI();
   }catch(err){
-    document.getElementById('pokemon-area').innerHTML = `
-      <p class="hint">Connexion impossible pour faire apparaître l'Œuf.</p>
-      <button class="secondary" id="retry-egg-btn" style="margin-top:10px;">Réessayer</button>
-    `;
-    document.getElementById('retry-egg-btn')?.addEventListener('click', spawnEgg);
+    if (!currentEncounter && !currentEgg){
+      document.getElementById('pokemon-area').innerHTML = `
+        <p class="hint">Connexion impossible pour faire apparaître l'Œuf.</p>
+        <button class="secondary" id="retry-egg-btn" style="margin-top:10px;">Réessayer</button>
+      `;
+      document.getElementById('retry-egg-btn')?.addEventListener('click', spawnEgg);
+    }
+  }finally{
+    isSpawningEncounter = false;
   }
 }
 
@@ -913,7 +1027,7 @@ function renderEggUI(){
   if (!currentEgg) return;
   const pct = Math.min(100, (currentEgg.distanceWalked / currentEgg.distanceNeeded) * 100);
   document.getElementById('pokemon-area').innerHTML = `
-    <p class="hint">Un Œuf a été déposé sur votre chemin</p>
+    <p class="hint">🥚 Un Œuf rare a été déposé sur votre chemin</p>
     <div class="egg-wrap"><span class="egg-emoji">🥚</span></div>
     <div class="bar-outer">
       <div class="bar-sweet" style="left:0; width:${pct}%; background:rgba(79,216,138,0.5); border:none;"></div>
@@ -922,18 +1036,10 @@ function renderEggUI(){
   `;
 }
 
-const SHINY_CHANCE = 1/100;
-
 function hatchEgg(){
   const mon = currentEgg.mon;
   currentEgg = null;
-  soundHatch();
-  vibrate([50,50,50,50,150]);
-  currentEncounter = mon;
-  currentEncounterShiny = Math.random() < SHINY_CHANCE;
-  if (currentEncounterShiny) showToast('✨ Un scintillement... Pokémon chromatique en approche !', 'gold');
-  renderEncounter(mon, true);
-  announceEncounter(currentEncounterShiny ? '✨ Un Pokémon chromatique est apparu !' : '🐾 Un Pokémon sauvage est apparu !');
+  presentWildEncounter(mon);
 }
 
 /* =========================================================
@@ -1028,10 +1134,10 @@ function renderCaptureUI(mon){
         <div class="bar-needle" id="bar-needle" style="left:0%;"></div>
       </div>
       <div class="btn-row">
-        <button class="primary" id="throw-btn" ${canThrow ? '' : 'disabled'}>${ballInfo.emoji} Lancer la ${ballInfo.label} (${trainer.balls[trainer.selectedBall]})</button>
+        <button class="primary ${canThrow ? '' : 'no-balls'}" id="throw-btn">${ballInfo.emoji} Lancer la ${ballInfo.label} (${trainer.balls[trainer.selectedBall]})</button>
         <button class="secondary" id="flee-btn">Laisser partir</button>
       </div>
-      ${totalBallCount()<=0 ? '<p class="hint" style="margin-top:8px;">Plus de Poké Balls ! Marchez pour en retrouver.</p>' : ''}
+      ${totalBallCount()<=0 ? '<p class="out-of-balls-hint">⚠️ Plus de Poké Balls ! Marchez pour en retrouver.</p>' : ''}
     </div>
   `;
 }
@@ -1068,7 +1174,12 @@ function startNeedleAnimation(mon){
 function attemptCapture(mon){
   ensureValidBallSelection();
   const ballKey = trainer.selectedBall;
-  if (trainer.balls[ballKey] <= 0) return;
+  if (trainer.balls[ballKey] <= 0){
+    showToast('⚠️ Plus de Poké Balls disponibles ! Marchez pour en récupérer.', 'gold');
+    const btn = document.getElementById('throw-btn');
+    if (btn){ btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake'); }
+    return;
+  }
   cancelAnimationFrame(captureTimer);
 
   const sweetWidth = mon.isLegendary ? 14 : 30;
@@ -1127,6 +1238,7 @@ function resolveCaptureSuccess(mon, wasPerfect){
   saveAll();
   currentEncounter = null;
   setRadarPaused(false);
+  updatePokemonHintMarker();
   renderEncounter(mon, false);
   const img = document.getElementById('encounter-img');
   if (img) img.classList.add('captured-pop');
@@ -1142,6 +1254,7 @@ function resolveCaptureFail(mon){
   } else {
     currentEncounter = null;
     setRadarPaused(false);
+    updatePokemonHintMarker();
     document.getElementById('pokemon-area').innerHTML = '<p class="hint">Le Pokémon a fui. Continuez à marcher !</p>';
   }
 }
@@ -1150,6 +1263,7 @@ function endEncounter(mon){
   cancelAnimationFrame(captureTimer);
   currentEncounter = null;
   setRadarPaused(false);
+  updatePokemonHintMarker();
   document.getElementById('pokemon-area').innerHTML = '<p class="hint">Vous laissez ' + mon.name + ' repartir. Continuez à marcher !</p>';
 }
 
@@ -1348,6 +1462,125 @@ function setRadarPaused(paused){
   document.getElementById('radar-paused-note')?.classList.toggle('show', paused);
 }
 
+/* =========================================================
+   CARTE GPS (Leaflet + OpenStreetMap)
+========================================================= */
+function destinationPoint(lat, lon, bearingDeg, distanceKm){
+  const R = 6371;
+  const brng = bearingDeg * Math.PI / 180;
+  const lat1 = lat * Math.PI / 180;
+  const lon1 = lon * Math.PI / 180;
+  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(distanceKm / R) + Math.cos(lat1) * Math.sin(distanceKm / R) * Math.cos(brng));
+  const lon2 = lon1 + Math.atan2(
+    Math.sin(brng) * Math.sin(distanceKm / R) * Math.cos(lat1),
+    Math.cos(distanceKm / R) - Math.sin(lat1) * Math.sin(lat2)
+  );
+  return { lat: lat2 * 180 / Math.PI, lon: ((lon2 * 180 / Math.PI) + 540) % 360 - 180 };
+}
+
+function resetHintBearing(){
+  hintBearing = Math.random() * 360;
+}
+
+// Fait progresser une position simulée sur la carte quand aucun signal GPS réel n'est utilisé
+// (mode test, ou permission GPS refusée) afin que la carte reste utile même sans vraie localisation.
+function advanceSimulatedPosition(distKm){
+  if (usingRealGPS || distKm <= 0) return;
+  if (!mapPosition) mapPosition = { ...SIM_START };
+  mapPosition = destinationPoint(mapPosition.lat, mapPosition.lon, SIM_HEADING_DEG, distKm);
+  updateMapPlayerPosition(mapPosition.lat, mapPosition.lon, false);
+}
+
+function updateMapPlayerPosition(lat, lon, isReal){
+  if (isReal) usingRealGPS = true;
+  mapPosition = { lat, lon };
+  pathCoords.push([lat, lon]);
+  if (pathCoords.length > 800) pathCoords.shift(); // limite mémoire sur les longues sessions
+
+  if (!leafletMap || typeof L === 'undefined') { updatePokemonHintMarker(); return; }
+
+  if (!playerMarker){
+    const icon = L.divIcon({ className:'', html:'<div class="map-player-dot"></div>', iconSize:[16,16] });
+    playerMarker = L.marker([lat, lon], { icon, zIndexOffset: 1000 }).addTo(leafletMap);
+  } else {
+    playerMarker.setLatLng([lat, lon]);
+  }
+
+  if (pathCoords.length > 1){
+    if (!pathLine){
+      pathLine = L.polyline(pathCoords, { color:'#6ee7ff', weight:3, opacity:0.6 }).addTo(leafletMap);
+    } else {
+      pathLine.setLatLngs(pathCoords);
+    }
+  }
+
+  updatePokemonHintMarker();
+}
+
+function refitMapView(){
+  if (!leafletMap || !playerMarker) return;
+  const points = [playerMarker.getLatLng()];
+  if (pokemonHintMarker) points.push(pokemonHintMarker.getLatLng());
+  if (points.length > 1){
+    leafletMap.flyToBounds(L.latLngBounds(points), { padding: [36, 36], maxZoom: 17 });
+  } else {
+    leafletMap.setView(points[0], Math.max(leafletMap.getZoom(), 16), { animate: true });
+  }
+}
+
+function updatePokemonHintMarker(){
+  if (!leafletMap || typeof L === 'undefined' || !mapPosition) return;
+  if (currentEncounter || currentEgg){
+    if (pokemonHintMarker){ leafletMap.removeLayer(pokemonHintMarker); pokemonHintMarker = null; refitMapView(); }
+    return;
+  }
+  if (hintBearing === null) resetHintBearing();
+  // La distance réelle jusqu'à la prochaine rencontre peut être de plusieurs km (hors du cadre visible de la carte à ce niveau de zoom) :
+  // on plafonne donc la distance "visuelle" du repère pour qu'il reste toujours dans le champ de vision.
+  // La vraie progression reste mesurée par la barre radar au-dessus, ce repère n'est qu'indicatif.
+  const realRemainingKm = Math.max(0.03, nextTarget - distSinceLastEncounter);
+  const remainingKm = Math.min(realRemainingKm, 0.35);
+  const point = destinationPoint(mapPosition.lat, mapPosition.lon, hintBearing, remainingKm);
+  if (!pokemonHintMarker){
+    const icon = L.divIcon({ className:'', html:'<div class="map-poke-marker">❓</div>', iconSize:[28,28] });
+    pokemonHintMarker = L.marker([point.lat, point.lon], { icon }).addTo(leafletMap);
+  } else {
+    pokemonHintMarker.setLatLng([point.lat, point.lon]);
+  }
+  refitMapView();
+}
+
+function initMapIfNeeded(){
+  const container = document.getElementById('leaflet-map');
+  if (typeof L === 'undefined'){
+    container.innerHTML = '<p class="map-hint" style="padding:16px;">Carte indisponible (connexion internet requise pour charger OpenStreetMap).</p>';
+    return;
+  }
+  if (leafletMap){ setTimeout(() => leafletMap.invalidateSize(), 60); return; }
+  const start = mapPosition || SIM_START;
+  leafletMap = L.map(container, { zoomControl:true, attributionControl:true }).setView([start.lat, start.lon], 16);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© OpenStreetMap'
+  }).addTo(leafletMap);
+  setTimeout(() => leafletMap.invalidateSize(), 100);
+  if (mapPosition) updateMapPlayerPosition(mapPosition.lat, mapPosition.lon, usingRealGPS);
+  updatePokemonHintMarker();
+}
+
+document.getElementById('map-toggle-btn').addEventListener('click', () => {
+  const container = document.getElementById('leaflet-map');
+  const btn = document.getElementById('map-toggle-btn');
+  const isHidden = container.style.display === 'none' || !container.style.display;
+  if (isHidden){
+    container.style.display = 'block';
+    btn.innerText = 'Masquer la carte';
+    initMapIfNeeded();
+  } else {
+    container.style.display = 'none';
+    btn.innerText = 'Afficher la carte';
+  }
+});
+
 let lastBlockedReminder = 0;
 function notifyBlockedProgress(){
   setRadarPaused(true);
@@ -1368,6 +1601,7 @@ function processDistance(dist, isTest){
   grantBallsForDistance(dist);
   updateDailyStats(dist);
   updateQuestsOnWalk(dist);
+  advanceSimulatedPosition(dist); // fait avancer la carte même sans GPS réel (mode test / permission refusée)
 
   if (currentEgg){
     currentEgg.distanceWalked += dist;
@@ -1383,9 +1617,15 @@ function processDistance(dist, isTest){
   } else {
     distSinceLastEncounter += dist;
     updateRadar(distSinceLastEncounter);
-    if (distSinceLastEncounter >= nextTarget){
+    updatePokemonHintMarker();
+    if (!isSpawningEncounter && distSinceLastEncounter >= nextTarget){
       distSinceLastEncounter = 0;
-      spawnEgg();
+      resetHintBearing();
+      if (Math.random() < EGG_CHANCE){
+        spawnEgg();
+      } else {
+        spawnDirectEncounter();
+      }
       nextTarget = generateRandomDistance();
       document.getElementById('target-km').innerText = nextTarget.toFixed(1);
       updateRadar(0);
@@ -1427,18 +1667,25 @@ if ("geolocation" in navigator){
         const speedKmh = distKm / dtHours;
 
         if (distMeters < MIN_MOVEMENT_METERS){
-          // Micro-déplacement probablement dû au bruit du capteur : on avance l'ancre sans compter de distance.
-          lastPosition = { lat, lon, t: now };
+          // Micro-déplacement probablement dû au bruit du capteur : on NE bouge PAS l'ancre,
+          // pour que les petits pas réels continuent de s'additionner par rapport au même point de départ
+          // au lieu d'être perdus un par un à chaque mise à jour GPS.
           return;
         }
 
         if (speedKmh > MAX_PLAUSIBLE_SPEED_KMH){
           document.getElementById('status').innerText = "Déplacement trop rapide ignoré (" + Math.round(speedKmh) + " km/h)";
         } else {
+          usingRealGPS = true;
           processDistance(distKm, false);
+          lastPosition = { lat, lon, t: now };
+          updateMapPlayerPosition(lat, lon, true);
         }
+        return;
       }
+      usingRealGPS = true;
       lastPosition = { lat, lon, t: now };
+      updateMapPlayerPosition(lat, lon, true);
     },
     (error) => {
       document.getElementById('status').innerText = "Erreur GPS : " + error.message;
