@@ -1,38 +1,49 @@
 // Service worker minimal : met en cache la page principale pour permettre
-// l’installation PWA et un chargement plus rapide. Les appels réseau (PokeAPI,
-// carte, météo) ne sont pas mis en cache et nécessitent toujours une connexion.
-const CACHE_NAME = ‘pokemon-gps-go-v1’;
-const SHELL_FILES = [’./index.html’, ‘./manifest.json’];
+// l'installation PWA et un chargement plus rapide hors-ligne. Les appels réseau
+// (PokeAPI, carte, météo) ne sont jamais mis en cache et nécessitent une connexion.
+//
+// IMPORTANT : CACHE_NAME est incrémenté à chaque changement de logique du service
+// worker lui-même, pour forcer les anciens caches à être purgés. Mais pour le
+// document HTML principal, on va plus loin : on ignore complètement le cache HTTP
+// du navigateur ({cache:'no-store'}) pour être certain de toujours récupérer la
+// dernière version déployée sur GitHub Pages tant qu'il y a du réseau, au lieu de
+// risquer de servir une copie périmée mise en cache par le navigateur lui-même.
+const CACHE_NAME = 'pokemon-gps-go-v2';
+const SHELL_FILES = ['./index.html', './manifest.json'];
 
-self.addEventListener(‘install’, (event) => {
-event.waitUntil(
-caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES)).catch(() => {})
-);
-self.skipWaiting();
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES)).catch(() => {})
+  );
+  self.skipWaiting();
 });
 
-self.addEventListener(‘activate’, (event) => {
-event.waitUntil(
-caches.keys().then((keys) =>
-Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-)
-);
-self.clients.claim();
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
 });
 
-self.addEventListener(‘fetch’, (event) => {
-// Stratégie “network first” avec repli sur le cache pour le shell seulement.
-if (event.request.method !== ‘GET’) return;
-const url = new URL(event.request.url);
-if (url.origin !== self.location.origin) return; // ne touche pas aux API externes
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return; // ne touche pas aux API externes
 
-event.respondWith(
-fetch(event.request)
-.then((res) => {
-const resClone = res.clone();
-caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resClone));
-return res;
-})
-.catch(() => caches.match(event.request))
-);
+  const isDocument = event.request.mode === 'navigate' || url.pathname.endsWith('/index.html') || url.pathname === '/';
+
+  event.respondWith(
+    (isDocument
+      ? fetch(event.request, { cache: 'no-store' }) // ignore le cache HTTP du navigateur pour la page principale
+      : fetch(event.request)
+    )
+      .then((res) => {
+        const resClone = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resClone));
+        return res;
+      })
+      .catch(() => caches.match(event.request))
+  );
 });
