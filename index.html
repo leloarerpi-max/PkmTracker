@@ -438,7 +438,7 @@
       <button class="map-toggle-btn" id="map-toggle-btn" type="button">Afficher la carte</button>
     </div>
     <div class="leaflet-map-container" id="leaflet-map" style="display:none;"></div>
-    <p class="map-hint" id="map-hint">Plusieurs repères ❓ apparaissent dans des directions différentes : dirige-toi vers n'importe lequel (à environ 30 m près) pour déclencher la rencontre immédiatement.</p>
+    <p class="map-hint" id="map-hint">Plusieurs repères ❓ apparaissent dans des directions différentes, ajustés sur les rues/chemins piétons. Marche vers n'importe lequel (à ~30 m près) pour déclencher la rencontre. En vous éloignant de tous, de nouveaux repères réapparaissent autour de vous.</p>
   </div>
 
   <div class="quests" id="quests-panel">
@@ -608,6 +608,7 @@ let usingRealGPS = false;
 let pokemonHintMarkers = []; // plusieurs repères ❓ affichés en même temps, dans des directions différentes
 let hintBearing = null; // conservé pour compat interne, plus vraiment utilisé (voir hintBearings)
 let hintTargetPoints = []; // points géographiques FIXES des repères, calculés une seule fois par recherche
+let hintGenerationToken = 0; // incrémenté à chaque nouvelle génération de repères, pour ignorer les réponses réseau devenues obsolètes
 const SIM_START = { lat: 48.8566, lon: 2.3522 }; // point de départ par défaut si pas de GPS réel (Paris)
 const SIM_HEADING_DEG = 47; // cap fixe pour une trajectoire simulée lisible en mode test
 
@@ -1238,6 +1239,11 @@ function beep(freq, duration, type, gain){
   freq = freq || 440; duration = duration || 0.12; type = type || 'sine'; gain = gain || 0.05;
   try{
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    // Safari (iPhone) crée le contexte audio à l'état "suspendu" tant qu'aucune vraie interaction
+    // utilisateur ne l'a débloqué : sans ce resume(), les sons déclenchés automatiquement (ex: une
+    // rencontre qui apparaît pendant la marche, sans que le joueur ait tapé l'écran juste avant)
+    // restent totalement silencieux, même si le téléphone n'est pas en mode silencieux.
+    if (audioCtx.state === 'suspended'){ audioCtx.resume().catch(() => {}); }
     const osc = audioCtx.createOscillator();
     const g = audioCtx.createGain();
     osc.type = type; osc.frequency.value = freq;
@@ -2685,6 +2691,7 @@ const HINT_MARKER_COUNT = 5; // nombre de repères ❓ affichés en même temps,
 function resetHintBearing(){
   hintBearing = Math.random() * 360; // conservé pour compat, plus utilisé directement
   hintTargetPoints = []; // invalide les anciens repères : de nouveaux points fixes seront calculés au prochain besoin
+  hintGenerationToken++;
 }
 
 // Fait progresser une position simulée sur la carte quand aucun signal GPS réel n'est utilisé
@@ -2701,6 +2708,8 @@ function updateMapPlayerPosition(lat, lon, isReal){
   mapPosition = { lat, lon };
   pathCoords.push([lat, lon]);
   if (pathCoords.length > 800) pathCoords.shift(); // limite mémoire sur les longues sessions
+
+  regenerateHintMarkersIfTooFar(); // si le joueur s'est trop éloigné de TOUS les repères, on en recalcule de nouveaux autour de lui
 
   if (!leafletMap || typeof L === 'undefined') { updatePokemonHintMarkers(); checkPinProximity(); return; }
 
@@ -2739,6 +2748,51 @@ function clearHintMarkers(){
   pokemonHintMarkers = [];
 }
 
+const HINT_REGENERATE_BUFFER_KM = 0.4; // au-delà de PIN_MAX_DISTANCE_KM + cette marge, on considère que le joueur s'est éloigné de TOUS les repères
+
+// Si le joueur s'éloigne de tous les repères actuels au lieu de s'en rapprocher (mauvaise direction),
+// on régénère un nouveau jeu de repères autour de sa position actuelle plutôt que de le laisser
+// poursuivre des repères devenus hors de portée. Corrige le cas où partir dans la mauvaise direction
+// bloquait toute chance d'atteindre un repère.
+function regenerateHintMarkersIfTooFar(){
+  if (!hintTargetPoints.length || !mapPosition) return;
+  if (currentEncounter || currentEgg) return;
+  const nearestKm = Math.min(...hintTargetPoints.map(pt =>
+    calculateDistance(mapPosition.lat, mapPosition.lon, pt.lat, pt.lon)
+  ));
+  if (nearestKm > PIN_MAX_DISTANCE_KM + HINT_REGENERATE_BUFFER_KM){
+    hintTargetPoints = [];
+    hintGenerationToken++;
+    if (leafletMap && pokemonHintMarkers.length) clearHintMarkers();
+  }
+}
+
+// Interroge OSRM (service de routage libre) pour "coller" un point au chemin piéton/route le plus
+// proche, afin d'éviter des repères placés au milieu d'un pâté de maisons, d'un plan d'eau, etc.
+// En cas d'échec (réseau, service indisponible), on garde simplement le point calculé géométriquement.
+async function snapToNearestRoad(point){
+  try{
+    const res = await fetch(`https://router.project-osrm.org/nearest/v1/foot/${point.lon},${point.lat}?number=1`);
+    if (!res.ok) return point;
+    const data = await res.json();
+    const loc = data && data.waypoints && data.waypoints[0] && data.waypoints[0].location;
+    if (loc && loc.length === 2) return { lat: loc[1], lon: loc[0] }; // OSRM renvoie [lon, lat]
+  }catch(e){ /* échec silencieux : le point géométrique d'origine reste utilisé */ }
+  return point;
+}
+
+// Ajuste tous les repères d'une génération donnée sur les rues/chemins réels, en tâche de fond
+// (n'empêche pas l'affichage immédiat des points bruts pendant que ça se calcule).
+async function snapHintPointsToRoads(rawPoints, token){
+  const snapped = await Promise.all(rawPoints.map(p => snapToNearestRoad(p)));
+  if (token !== hintGenerationToken) return; // une nouvelle recherche a démarré entre-temps : réponse obsolète, on ignore
+  hintTargetPoints = snapped;
+  if (leafletMap && pokemonHintMarkers.length === snapped.length){
+    pokemonHintMarkers.forEach((m, i) => m.setLatLng([snapped[i].lat, snapped[i].lon]));
+    refitMapView();
+  }
+}
+
 function updatePokemonHintMarkers(){
   if (!leafletMap || typeof L === 'undefined' || !mapPosition) return;
   if (currentEncounter || currentEgg){
@@ -2750,15 +2804,20 @@ function updatePokemonHintMarkers(){
     // Les repères sont ancrés UNE SEULE FOIS à des points fixes du monde réel, au moment où la recherche
     // commence, chacun dans une direction différente. Atteindre N'IMPORTE LEQUEL déclenche la rencontre
     // immédiatement (voir checkPinProximity) : plusieurs chances, plusieurs directions possibles.
+    hintGenerationToken++;
+    const myToken = hintGenerationToken;
     const realRemainingKm = Math.max(0.03, nextTarget - distSinceLastEncounter);
     const maxDisplayKm = Math.min(realRemainingKm, PIN_MAX_DISTANCE_KM);
     // Répartit les repères sur des secteurs de la boussole pour éviter qu'ils se retrouvent collés ensemble.
     const sectorSize = 360 / HINT_MARKER_COUNT;
+    const rawPoints = [];
     for (let i = 0; i < HINT_MARKER_COUNT; i++){
       const bearing = (i * sectorSize) + Math.random() * sectorSize;
       const distanceKm = Math.max(0.15, Math.random() * maxDisplayKm); // distances variées : certains plus proches que d'autres
-      hintTargetPoints.push(destinationPoint(mapPosition.lat, mapPosition.lon, bearing, distanceKm));
+      rawPoints.push(destinationPoint(mapPosition.lat, mapPosition.lon, bearing, distanceKm));
     }
+    hintTargetPoints = rawPoints; // affichage immédiat avec les points bruts, ajustés dès que possible
+    snapHintPointsToRoads(rawPoints, myToken);
   }
   if (!pokemonHintMarkers.length){
     hintTargetPoints.forEach(pt => {
@@ -2937,6 +2996,35 @@ function retryWakeLockOnGesture(){
 }
 document.addEventListener('click', retryWakeLockOnGesture);
 document.addEventListener('touchend', retryWakeLockOnGesture);
+
+// Même logique pour le son : on crée/débloque le contexte audio dès la toute première interaction,
+// pour être sûr qu'il soit prêt avant qu'une rencontre déclenchée automatiquement (pendant la marche)
+// n'essaie de jouer un son sans qu'aucune interaction ne l'ait encore débloqué.
+// On écoute plusieurs types d'évènements (pas juste "click") : les apps ajoutées à l'écran d'accueil
+// sur iPhone (mode "standalone", hors de l'interface Safari) sont historiquement moins fiables que
+// Safari lui-même pour débloquer l'audio, donc on multiplie les occasions de le déclencher.
+let audioUnlocked = false;
+function unlockAudioOnGesture(){
+  if (audioUnlocked) return;
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended'){
+      audioCtx.resume().then(() => { audioUnlocked = true; }).catch(() => {});
+    } else {
+      audioUnlocked = true;
+    }
+    // Joue un son quasi inaudible : sur certains navigateurs, resume() seul ne suffit pas tant
+    // qu'un son n'a pas réellement été émis au moins une fois pendant le geste utilisateur.
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    g.gain.value = 0.0001;
+    osc.connect(g); g.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.01);
+  }catch(e){ /* audio indisponible sur ce navigateur : rien à faire */ }
+}
+['click', 'touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(evt =>
+  document.addEventListener(evt, unlockAudioOnGesture, { once: true })
+);
 
 if (!('wakeLock' in navigator)){
   setTimeout(() => showToast("💡 Astuce : ton navigateur ne permet pas de garder l'écran allumé automatiquement. Augmente le délai de verrouillage de ton téléphone pendant que tu joues.", 'gold'), 2500);
