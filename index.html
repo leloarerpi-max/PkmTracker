@@ -505,6 +505,7 @@ trainer.lightMode = !!trainer.lightMode;
 trainer.totalDistance = trainer.totalDistance || 0;
 trainer.distSinceLastEncounter = trainer.distSinceLastEncounter || 0;
 trainer.nextTarget = trainer.nextTarget || null; // null = pas encore de cible générée (nouvelle partie)
+trainer.encounterPending = !!trainer.encounterPending;
 
 // Ces trois valeurs pilotent la distance totale, la progression vers la prochaine rencontre et le
 // déclenchement des Raids. Avant, elles n'étaient JAMAIS sauvegardées : elles repartaient de zéro à
@@ -514,12 +515,27 @@ let totalDistance = trainer.totalDistance;
 let lastPosition = null;   // {lat, lon, t} — ancre GPS, se régénère naturellement au premier point reçu
 let distSinceLastEncounter = trainer.distSinceLastEncounter;
 
-// Synchronise ces valeurs dans l'objet trainer (donc dans la sauvegarde et l'export) à chaque changement.
+// Synchronise ces valeurs dans l'objet trainer (donc dans la sauvegarde et l'export) à chaque changement,
+// ET rafraîchit systématiquement l'affichage : sans ça, une valeur pouvait changer en interne (import,
+// résolution de rencontre, ajout manuel de distance...) sans que le chiffre à l'écran soit mis à jour,
+// laissant le joueur devant une distance restante périmée.
 function syncDistanceState(){
   trainer.totalDistance = totalDistance;
   trainer.distSinceLastEncounter = distSinceLastEncounter;
   trainer.nextTarget = nextTarget;
+  // Mémorise qu'une rencontre était en cours : si le joueur ferme le jeu à ce moment-là, on lui en
+  // redonnera une immédiatement au retour, au lieu de lui faire refaire toute la distance (ce qui
+  // donnait l'impression de perdre sa progression).
+  trainer.encounterPending = !!(currentEncounter || currentEgg);
   saveAll();
+  refreshDistanceDisplay();
+}
+
+// Remet à jour tout ce qui affiche la distance à l'écran, à partir de l'état réel du jeu.
+function refreshDistanceDisplay(){
+  const kmEl = document.getElementById('km');
+  if (kmEl) kmEl.innerText = totalDistance.toFixed(3);
+  updateRadar(distSinceLastEncounter);
 }
 
 const BALL_INFO = {
@@ -1496,6 +1512,7 @@ function importSave(evt){
       trainer.lightMode = !!trainer.lightMode;
       trainer.totalDistance = trainer.totalDistance || 0;
       trainer.distSinceLastEncounter = trainer.distSinceLastEncounter || 0;
+      trainer.encounterPending = !!trainer.encounterPending;
       // Restaure les variables actives à partir de la sauvegarde importée (au lieu de repartir de zéro) :
       // c'est précisément ce qui causait "distance énorme / progression perdue" après un import.
       totalDistance = trainer.totalDistance;
@@ -1943,6 +1960,8 @@ function presentWildEncounter(mon, isRaid){
   if (isRaid) showToast('⚔️ Un Raid sauvage apparaît sur votre route !', 'gold');
   else if (currentEncounterShiny) showToast('✨ Un scintillement... Pokémon chromatique en approche !', 'gold');
   renderEncounter(mon, true);
+  updateRadar(distSinceLastEncounter); // rafraîchit l'affichage maintenant que la rencontre est réellement ouverte
+  syncDistanceState();                 // mémorise qu'une rencontre est en attente (utile si le joueur ferme le jeu)
   announceEncounter(isRaid ? '⚔️ Un Pokémon de Raid est apparu !' : (currentEncounterShiny ? '✨ Un Pokémon chromatique est apparu !' : '🐾 Un Pokémon sauvage est apparu !'));
 }
 
@@ -1982,6 +2001,8 @@ async function spawnEgg(){
     currentEgg = { mon, distanceNeeded, distanceWalked: 0 };
     soundEgg(); vibrate(60);
     renderEggUI();
+    updateRadar(distSinceLastEncounter); // affiche "rencontre en cours" plutôt qu'une distance trompeuse
+    syncDistanceState();
   }catch(err){
     if (!currentEncounter && !currentEgg){
       document.getElementById('pokemon-area').innerHTML = `
@@ -2253,6 +2274,7 @@ function resolveCaptureSuccess(mon, wasPerfect){
   currentEncounter = null;
   currentEncounterRaid = false;
   setRadarPaused(false);
+  resolveEncounterEnd(); // c'est ici qu'on tire la distance avant la PROCHAINE rencontre
   updatePokemonHintMarkers();
   renderEncounter(mon, false);
   const img = document.getElementById('encounter-img');
@@ -2271,6 +2293,7 @@ function resolveCaptureFail(mon){
     currentEncounter = null;
     currentEncounterRaid = false;
     setRadarPaused(false);
+    resolveEncounterEnd();
     updatePokemonHintMarkers();
     document.getElementById('pokemon-area').innerHTML = '<p class="hint">Le Pokémon a fui. Continuez à marcher !</p>';
   }
@@ -2282,6 +2305,7 @@ function endEncounter(mon){
   currentEncounterRaid = false;
   trainer.captureCombo = 0;
   setRadarPaused(false);
+  resolveEncounterEnd();
   updatePokemonHintMarkers();
   document.getElementById('pokemon-area').innerHTML = '<p class="hint">Vous laissez ' + mon.name + ' repartir. Continuez à marcher !</p>';
 }
@@ -2475,13 +2499,24 @@ async function viewCaughtPokemon(id, shiny){
    RADAR
 ========================================================= */
 function updateRadar(dist){
+  const targetEl = document.getElementById('target-km');
+
+  // Tant qu'une rencontre (ou un Œuf) est en cours, on n'affiche pas de distance : le joueur vient
+  // justement d'atteindre son objectif, afficher un nouveau chiffre ici lui ferait croire à tort
+  // qu'il a perdu sa progression.
+  if (currentEncounter || currentEgg){
+    document.getElementById('radar-progress').style.strokeDashoffset = 0; // jauge pleine : objectif atteint
+    targetEl.innerText = '— rencontre en cours';
+    targetEl.classList.add('close');
+    return;
+  }
+
   const ratio = Math.min(1, dist / nextTarget);
   const offset = RADAR_CIRC * (1 - ratio);
   document.getElementById('radar-progress').style.strokeDashoffset = offset;
 
   // Distance restante avant la prochaine rencontre : diminue au fur et à mesure qu'on s'approche.
   const remaining = Math.max(0, nextTarget - dist);
-  const targetEl = document.getElementById('target-km');
   targetEl.innerText = remaining.toFixed(2) + ' km';
   targetEl.classList.toggle('close', remaining <= 0.3);
 }
@@ -2670,8 +2705,19 @@ function triggerNextSpawn(){
   } else {
     spawnDirectEncounter(false);
   }
+  // On NE tire PAS tout de suite la distance de la prochaine rencontre : tant que la rencontre en cours
+  // n'est pas résolue, afficher un nouveau gros chiffre (ex: "4.05 km restants") juste après avoir
+  // atteint son objectif donne l'impression au joueur d'avoir perdu sa progression. La nouvelle cible
+  // est donc générée par resolveEncounterEnd(), une fois le Pokémon attrapé ou laissé partir.
+  refreshDistanceDisplay();
+}
+
+// Appelé quand une rencontre se termine (capture réussie, échec définitif, ou fuite volontaire) :
+// c'est à ce moment seulement qu'on tire la distance à parcourir avant la rencontre suivante.
+function resolveEncounterEnd(){
   nextTarget = generateRandomDistance();
-  updateRadar(0);
+  distSinceLastEncounter = 0;
+  syncDistanceState(); // sauvegarde ET rafraîchit l'affichage d'un coup
 }
 
 function processDistance(dist, isTest){
@@ -2706,8 +2752,7 @@ function processDistance(dist, isTest){
       trainer.lastRaidKm = totalDistance;
       spawnDirectEncounter(true);
       distSinceLastEncounter = 0;
-      updateRadar(0);
-      syncDistanceState();
+      syncDistanceState(); // sauvegarde ET rafraîchit l'affichage
       return;
     }
     distSinceLastEncounter += dist;
@@ -2858,6 +2903,18 @@ if ('serviceWorker' in navigator){
 // Placé en tout dernier, une fois que TOUT le script (toutes les variables let/const) a fini de s'initialiser,
 // pour éviter les erreurs "Cannot access before initialization" que ça a causées plus tôt en le plaçant trop tôt.
 checkManualDistanceFromURL(); // récupère une distance envoyée via un Raccourci Apple (?addKm=X.XX), si présente
+
+// Si le joueur avait une rencontre en cours quand il a quitté le jeu, on la lui redonne tout de suite
+// au lieu de la perdre : sinon il devrait refaire toute la distance, ce qui donne l'impression très
+// frustrante d'avoir perdu sa progression alors qu'il avait bien atteint son objectif.
+if (trainer.encounterPending && !currentEncounter && !currentEgg){
+  trainer.encounterPending = false;
+  saveAll();
+  setTimeout(() => {
+    showToast('🔄 Reprise de votre rencontre en cours...', 'gold');
+    spawnDirectEncounter(false);
+  }, 800);
+}
 </script>
 
 </body>
