@@ -328,6 +328,35 @@
 
   /* --- Palier Platine (badges de type) --- */
   .type-badge-item.platinum{ box-shadow:0 0 12px rgba(190,220,255,0.5); }
+
+  /* --- Effets d'apparition d'un Pokémon --- */
+  #encounter-flash{ position:fixed; inset:0; z-index:69; pointer-events:none; opacity:0; }
+  #encounter-flash.show{ animation:levelupFlash 0.65s ease-out; }
+
+  @keyframes spawnPop{
+    0%{ transform:scale(0.25) rotate(-14deg); opacity:0; }
+    55%{ transform:scale(1.14) rotate(5deg); opacity:1; }
+    75%{ transform:scale(0.94) rotate(-3deg); }
+    100%{ transform:scale(1) rotate(0); }
+  }
+  img.pokemon-img.spawn-in{ animation:spawnPop 0.5s cubic-bezier(.34,1.56,.64,1); }
+
+  .impact-ring{ position:absolute; inset:0; margin:auto; width:60px; height:60px; border-radius:50%;
+    border:3px solid rgba(255,255,255,0.65); opacity:0; pointer-events:none; }
+  .impact-ring.show{ animation:ringExpand 0.55s ease-out; }
+  @keyframes ringExpand{
+    0%{ width:50px; height:50px; opacity:0.85; }
+    100%{ width:230px; height:230px; opacity:0; }
+  }
+
+  @keyframes stageShake{
+    0%,100%{ transform:translateX(0); }
+    20%{ transform:translateX(-6px) translateY(1px); }
+    40%{ transform:translateX(5px) translateY(-1px); }
+    60%{ transform:translateX(-4px); }
+    80%{ transform:translateX(3px); }
+  }
+  .stage.shake{ animation:stageShake 0.4s ease-in-out; }
 </style>
 </head>
 <body>
@@ -335,6 +364,7 @@
 <div class="toast" id="toast"></div>
 <canvas id="weather-canvas"></canvas>
 <div id="levelup-flash"></div>
+<div id="encounter-flash"></div>
 <canvas id="confetti-canvas"></canvas>
 
 <div class="card">
@@ -1225,6 +1255,108 @@ function soundLevelUp(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f
 function soundEgg(){ beep(440,0.15); }
 function soundHatch(){ beep(784,0.12); setTimeout(()=>beep(988,0.15),120); }
 
+// Petit thème sonore joué à l'apparition d'un Pokémon, différent selon sa rareté : un simple
+// beep-beep faisait un peu plat, on lui donne un vrai petit "sting" musical à chaque fois.
+function playEncounterFanfare(kind){
+  if (kind === 'raid'){
+    // Impact sourd suivi d'un accord tendu, pour marquer le coup.
+    beep(90, 0.28, 'sawtooth', 0.09);
+    setTimeout(() => beep(196, 0.16, 'sawtooth', 0.05), 90);
+    setTimeout(() => beep(247, 0.2, 'square', 0.05), 210);
+    setTimeout(() => beep(370, 0.28, 'square', 0.05), 330);
+    return;
+  }
+  if (kind === 'legendary'){
+    // Arpège plus lent et grave, façon fanfare.
+    [392, 494, 587, 784].forEach((f, i) => setTimeout(() => beep(f, 0.3, 'triangle', 0.065), i * 140));
+    return;
+  }
+  // Rencontre normale / chromatique : petit arpège montant, léger et vif.
+  [523, 659, 784].forEach((f, i) => setTimeout(() => beep(f, 0.12, 'sine', 0.05), i * 85));
+  if (kind === 'shiny'){
+    // Un scintillement aigu par-dessus, juste après l'arpège de base.
+    setTimeout(() => { beep(1568, 0.15, 'sine', 0.045); setTimeout(() => beep(1976, 0.2, 'sine', 0.04), 90); }, 280);
+  }
+}
+
+// Explosion de particules courte et ciblée sur le sprite (différente du confetti de célébration,
+// plus rapide, en éclatement radial façon "pop"), plus un flash d'écran et une secousse pour les Raids.
+function spawnEncounterVisual(kind){
+  const flash = document.getElementById('encounter-flash');
+  if (flash){
+    const gradients = {
+      raid: 'radial-gradient(circle, rgba(239,77,94,0.55), rgba(239,77,94,0) 70%)',
+      legendary: 'radial-gradient(circle, rgba(255,205,60,0.55), rgba(255,205,60,0) 70%)',
+      shiny: 'radial-gradient(circle, rgba(255,205,60,0.5), rgba(110,231,255,0.15) 40%, transparent 70%)',
+      normal: 'radial-gradient(circle, rgba(110,231,255,0.35), rgba(110,231,255,0) 70%)'
+    };
+    flash.style.background = gradients[kind] || gradients.normal;
+    flash.classList.remove('show');
+    void flash.offsetWidth;
+    flash.classList.add('show');
+  }
+  if (kind === 'raid'){
+    const stage = document.getElementById('pokemon-area');
+    if (stage){
+      stage.classList.remove('shake');
+      void stage.offsetWidth;
+      stage.classList.add('shake');
+      setTimeout(() => stage.classList.remove('shake'), 450);
+    }
+  }
+  burstEncounterParticles(kind);
+}
+
+function burstEncounterParticles(kind){
+  const canvas = document.getElementById('confetti-canvas');
+  const stage = document.getElementById('pokemon-area');
+  if (!canvas || !stage || !canvas.getContext) return;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const rect = stage.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + Math.min(rect.height, 220) / 2 + 30;
+  const palettes = {
+    raid: ['#ef4d5e', '#ffcd3c', '#ff9d4d'],
+    legendary: ['#ffcd3c', '#ff9d4d', '#fff3c4'],
+    shiny: ['#ffcd3c', '#fff9c4', '#6ee7ff'],
+    normal: ['#6ee7ff', '#7c8cff', '#eef1fb']
+  };
+  const colors = palettes[kind] || palettes.normal;
+  const count = (kind === 'raid' || kind === 'legendary') ? 42 : 26;
+  const particles = Array.from({ length: count }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2.5 + Math.random() * 5;
+    return {
+      x: cx, y: cy,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+      r: 3 + Math.random() * 3.5,
+      color: colors[Math.floor(Math.random() * colors.length)]
+    };
+  });
+  let frame = 0;
+  const maxFrames = 32;
+  function draw(){
+    frame++;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const life = Math.max(0, 1 - frame / maxFrames);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.18;
+      ctx.globalAlpha = life;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    if (frame < maxFrames) requestAnimationFrame(draw);
+    else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  draw();
+}
+
 function toggleMute(){
   trainer.muted = !trainer.muted;
   saveAll();
@@ -1955,11 +2087,13 @@ function presentWildEncounter(mon, isRaid){
   currentEncounter = mon;
   currentEncounterShiny = rollShiny();
   currentEncounterRaid = !!isRaid;
-  soundHatch();
-  vibrate(isRaid ? [80,60,80,60,80,60,200] : [50,50,50,50,150]);
+  const fxKind = isRaid ? 'raid' : (mon.isLegendary ? 'legendary' : (currentEncounterShiny ? 'shiny' : 'normal'));
+  playEncounterFanfare(fxKind);
+  vibrate(isRaid ? [80,60,80,60,80,60,200] : (fxKind !== 'normal' ? [50,50,50,50,50,150] : [50,50,50,50,150]));
   if (isRaid) showToast('⚔️ Un Raid sauvage apparaît sur votre route !', 'gold');
   else if (currentEncounterShiny) showToast('✨ Un scintillement... Pokémon chromatique en approche !', 'gold');
   renderEncounter(mon, true);
+  spawnEncounterVisual(fxKind);
   updateRadar(distSinceLastEncounter); // rafraîchit l'affichage maintenant que la rencontre est réellement ouverte
   syncDistanceState();                 // mémorise qu'une rencontre est en attente (utile si le joueur ferme le jeu)
   announceEncounter(isRaid ? '⚔️ Un Pokémon de Raid est apparu !' : (currentEncounterShiny ? '✨ Un Pokémon chromatique est apparu !' : '🐾 Un Pokémon sauvage est apparu !'));
@@ -2064,7 +2198,8 @@ function renderEncounter(mon, isWild){
     <div class="poke-img-wrap">
       ${mon.isLegendary ? '<div class="legend-ring"></div>' : ''}
       ${shiny ? '<span class="shiny-badge">✨</span>' : ''}
-      <img class="pokemon-img" id="encounter-img" src="${displayImage}" alt="${mon.name}">
+      ${isWild ? '<div class="impact-ring show"></div>' : ''}
+      <img class="pokemon-img ${isWild ? 'spawn-in' : ''}" id="encounter-img" src="${displayImage}" alt="${mon.name}">
     </div>
     <div class="types-row">${typesHtml}</div>
     <p class="flavor-text">"${mon.description}"</p>
@@ -2072,6 +2207,9 @@ function renderEncounter(mon, isWild){
   `;
 
   if (isWild){
+    const img = document.getElementById('encounter-img');
+    // Une fois le "pop" d'entrée terminé, on retire la classe pour laisser la respiration idle reprendre.
+    img?.addEventListener('animationend', () => img.classList.remove('spawn-in'), { once: true });
     document.getElementById('action-slot').innerHTML = renderCaptureUI(mon);
     wireBallSelector();
     startNeedleAnimation(mon);
