@@ -2749,7 +2749,15 @@ if (!('wakeLock' in navigator)){
 ========================================================= */
 const MAX_PLAUSIBLE_SPEED_KMH = 25;
 const MAX_ACCURACY_METERS = 30;   // au-delà, le point GPS est jugé trop imprécis pour servir d'ancre
-const MIN_MOVEMENT_METERS = 4;    // en dessous, on considère que c'est du bruit GPS (pas un vrai déplacement)
+const MIN_MOVEMENT_METERS = 8;    // en dessous, on considère que c'est du bruit GPS (pas un vrai déplacement)
+                                   // relevé de 4 à 8 m : le bruit naturel d'un GPS de téléphone à l'arrêt
+                                   // dépasse souvent 4 m, ce qui faisait avancer la distance en restant assis.
+
+// En plus du seuil ci-dessus, on exige qu'un déplacement soit confirmé par DEUX relevés GPS consécutifs
+// avant de le compter (au lieu de le valider sur un seul relevé). Un bruit GPS ponctuel dépasse rarement
+// 8 m deux fois de suite dans la continuité ; une vraie marche, si.
+let pendingPosition = null;
+const PENDING_TIMEOUT_MS = 25000; // au-delà, on abandonne la confirmation en attente (redémarre à zéro)
 
 if ("geolocation" in navigator){
   navigator.geolocation.watchPosition(
@@ -2777,19 +2785,35 @@ if ("geolocation" in navigator){
 
         if (distMeters < MIN_MOVEMENT_METERS){
           // Micro-déplacement probablement dû au bruit du capteur : on NE bouge PAS l'ancre,
-          // pour que les petits pas réels continuent de s'additionner par rapport au même point de départ
-          // au lieu d'être perdus un par un à chaque mise à jour GPS.
+          // et on annule toute confirmation en attente (retour dans la zone de bruit = fausse alerte).
+          pendingPosition = null;
           return;
         }
 
         if (speedKmh > MAX_PLAUSIBLE_SPEED_KMH){
           document.getElementById('status').innerText = "Déplacement trop rapide ignoré (" + Math.round(speedKmh) + " km/h)";
-        } else {
-          usingRealGPS = true;
-          processDistance(distKm, false);
-          lastPosition = { lat, lon, t: now };
-          updateMapPlayerPosition(lat, lon, true);
+          pendingPosition = null;
+          return;
         }
+
+        if (pendingPosition && (now - pendingPosition.t) > PENDING_TIMEOUT_MS){
+          pendingPosition = null; // la confirmation a trop tardé, on repart de zéro par sécurité
+        }
+
+        if (!pendingPosition){
+          // Premier relevé au-delà du seuil de bruit : on ne valide pas tout de suite, on attend
+          // une confirmation sur le relevé suivant pour écarter une dérive GPS ponctuelle.
+          pendingPosition = { lat, lon, t: now };
+          document.getElementById('status').innerText = "Mouvement détecté, confirmation en cours...";
+          return;
+        }
+
+        // Deuxième relevé consécutif qui confirme un déplacement soutenu : on valide.
+        usingRealGPS = true;
+        processDistance(distKm, false);
+        lastPosition = { lat, lon, t: now };
+        pendingPosition = null;
+        updateMapPlayerPosition(lat, lon, true);
         return;
       }
       usingRealGPS = true;
