@@ -408,7 +408,7 @@
       <button class="map-toggle-btn" id="map-toggle-btn" type="button">Afficher la carte</button>
     </div>
     <div class="leaflet-map-container" id="leaflet-map" style="display:none;"></div>
-    <p class="map-hint" id="map-hint">Le repère ❓ est fixe : marche jusqu'à lui (à environ 30 m près) pour déclencher la rencontre immédiatement, sans attendre le reste de la jauge boussole.</p>
+    <p class="map-hint" id="map-hint">Plusieurs repères ❓ apparaissent dans des directions différentes : dirige-toi vers n'importe lequel (à environ 30 m près) pour déclencher la rencontre immédiatement.</p>
   </div>
 
   <div class="quests" id="quests-panel">
@@ -559,9 +559,9 @@ let pathLine = null;
 let pathCoords = [];
 let mapPosition = null;      // {lat, lon} affiché sur la carte (réel si GPS actif, sinon simulé)
 let usingRealGPS = false;
-let pokemonHintMarker = null;
-let hintBearing = null;
-let hintTargetPoint = null; // point géographique FIXE du repère, calculé une seule fois par recherche
+let pokemonHintMarkers = []; // plusieurs repères ❓ affichés en même temps, dans des directions différentes
+let hintBearing = null; // conservé pour compat interne, plus vraiment utilisé (voir hintBearings)
+let hintTargetPoints = []; // points géographiques FIXES des repères, calculés une seule fois par recherche
 const SIM_START = { lat: 48.8566, lon: 2.3522 }; // point de départ par défaut si pas de GPS réel (Paris)
 const SIM_HEADING_DEG = 47; // cap fixe pour une trajectoire simulée lisible en mode test
 
@@ -1507,7 +1507,7 @@ function importSave(evt){
       renderCompanion(); renderBerries(); ensureWeeklyQuest(); renderWeeklyQuest(); renderStreakCalendar(); renderProgressChart();
       document.getElementById('km').innerText = totalDistance.toFixed(3);
       updateRadar(distSinceLastEncounter);
-      updatePokemonHintMarker();
+      updatePokemonHintMarkers();
       showToast('📥 Sauvegarde importée avec succès !', 'green');
     }catch(e){
       showToast('Fichier de sauvegarde invalide.');
@@ -2253,7 +2253,7 @@ function resolveCaptureSuccess(mon, wasPerfect){
   currentEncounter = null;
   currentEncounterRaid = false;
   setRadarPaused(false);
-  updatePokemonHintMarker();
+  updatePokemonHintMarkers();
   renderEncounter(mon, false);
   const img = document.getElementById('encounter-img');
   if (img) img.classList.add('captured-pop');
@@ -2271,7 +2271,7 @@ function resolveCaptureFail(mon){
     currentEncounter = null;
     currentEncounterRaid = false;
     setRadarPaused(false);
-    updatePokemonHintMarker();
+    updatePokemonHintMarkers();
     document.getElementById('pokemon-area').innerHTML = '<p class="hint">Le Pokémon a fui. Continuez à marcher !</p>';
   }
 }
@@ -2282,7 +2282,7 @@ function endEncounter(mon){
   currentEncounterRaid = false;
   trainer.captureCombo = 0;
   setRadarPaused(false);
-  updatePokemonHintMarker();
+  updatePokemonHintMarkers();
   document.getElementById('pokemon-area').innerHTML = '<p class="hint">Vous laissez ' + mon.name + ' repartir. Continuez à marcher !</p>';
 }
 
@@ -2507,9 +2507,11 @@ function destinationPoint(lat, lon, bearingDeg, distanceKm){
   return { lat: lat2 * 180 / Math.PI, lon: ((lon2 * 180 / Math.PI) + 540) % 360 - 180 };
 }
 
+const HINT_MARKER_COUNT = 5; // nombre de repères ❓ affichés en même temps, dans des directions différentes
+
 function resetHintBearing(){
-  hintBearing = Math.random() * 360;
-  hintTargetPoint = null; // invalide l'ancien repère : un nouveau point fixe sera calculé au prochain besoin
+  hintBearing = Math.random() * 360; // conservé pour compat, plus utilisé directement
+  hintTargetPoints = []; // invalide les anciens repères : de nouveaux points fixes seront calculés au prochain besoin
 }
 
 // Fait progresser une position simulée sur la carte quand aucun signal GPS réel n'est utilisé
@@ -2527,7 +2529,7 @@ function updateMapPlayerPosition(lat, lon, isReal){
   pathCoords.push([lat, lon]);
   if (pathCoords.length > 800) pathCoords.shift(); // limite mémoire sur les longues sessions
 
-  if (!leafletMap || typeof L === 'undefined') { updatePokemonHintMarker(); checkPinProximity(); return; }
+  if (!leafletMap || typeof L === 'undefined') { updatePokemonHintMarkers(); checkPinProximity(); return; }
 
   if (!playerMarker){
     const icon = L.divIcon({ className:'', html:'<div class="map-player-dot"></div>', iconSize:[16,16] });
@@ -2544,14 +2546,14 @@ function updateMapPlayerPosition(lat, lon, isReal){
     }
   }
 
-  updatePokemonHintMarker();
+  updatePokemonHintMarkers();
   checkPinProximity();
 }
 
 function refitMapView(){
   if (!leafletMap || !playerMarker) return;
   const points = [playerMarker.getLatLng()];
-  if (pokemonHintMarker) points.push(pokemonHintMarker.getLatLng());
+  pokemonHintMarkers.forEach(m => points.push(m.getLatLng()));
   if (points.length > 1){
     leafletMap.flyToBounds(L.latLngBounds(points), { padding: [36, 36], maxZoom: 17 });
   } else {
@@ -2559,42 +2561,55 @@ function refitMapView(){
   }
 }
 
-function updatePokemonHintMarker(){
+function clearHintMarkers(){
+  pokemonHintMarkers.forEach(m => leafletMap.removeLayer(m));
+  pokemonHintMarkers = [];
+}
+
+function updatePokemonHintMarkers(){
   if (!leafletMap || typeof L === 'undefined' || !mapPosition) return;
   if (currentEncounter || currentEgg){
-    if (pokemonHintMarker){ leafletMap.removeLayer(pokemonHintMarker); pokemonHintMarker = null; refitMapView(); }
-    hintTargetPoint = null; // sera recalculé pour la prochaine recherche
+    if (pokemonHintMarkers.length){ clearHintMarkers(); refitMapView(); }
+    hintTargetPoints = []; // seront recalculés pour la prochaine recherche
     return;
   }
-  if (hintBearing === null) resetHintBearing();
-  if (!hintTargetPoint){
-    // Le repère est ancré UNE SEULE FOIS à un point fixe du monde réel, au moment où la recherche commence.
-    // Il représente maintenant un vrai objectif : l'atteindre déclenche la rencontre immédiatement (voir
-    // checkPinProximity), donc sa distance est plafonnée à une valeur raisonnable à parcourir à pied,
-    // même si la distance "officielle" avant rencontre (nextTarget) est plus grande.
+  if (!hintTargetPoints.length){
+    // Les repères sont ancrés UNE SEULE FOIS à des points fixes du monde réel, au moment où la recherche
+    // commence, chacun dans une direction différente. Atteindre N'IMPORTE LEQUEL déclenche la rencontre
+    // immédiatement (voir checkPinProximity) : plusieurs chances, plusieurs directions possibles.
     const realRemainingKm = Math.max(0.03, nextTarget - distSinceLastEncounter);
-    const displayDistanceKm = Math.min(realRemainingKm, PIN_MAX_DISTANCE_KM);
-    hintTargetPoint = destinationPoint(mapPosition.lat, mapPosition.lon, hintBearing, displayDistanceKm);
+    const maxDisplayKm = Math.min(realRemainingKm, PIN_MAX_DISTANCE_KM);
+    // Répartit les repères sur des secteurs de la boussole pour éviter qu'ils se retrouvent collés ensemble.
+    const sectorSize = 360 / HINT_MARKER_COUNT;
+    for (let i = 0; i < HINT_MARKER_COUNT; i++){
+      const bearing = (i * sectorSize) + Math.random() * sectorSize;
+      const distanceKm = Math.max(0.15, Math.random() * maxDisplayKm); // distances variées : certains plus proches que d'autres
+      hintTargetPoints.push(destinationPoint(mapPosition.lat, mapPosition.lon, bearing, distanceKm));
+    }
   }
-  if (!pokemonHintMarker){
-    const icon = L.divIcon({ className:'', html:'<div class="map-poke-marker">❓</div>', iconSize:[28,28] });
-    pokemonHintMarker = L.marker([hintTargetPoint.lat, hintTargetPoint.lon], { icon }).addTo(leafletMap);
+  if (!pokemonHintMarkers.length){
+    hintTargetPoints.forEach(pt => {
+      const icon = L.divIcon({ className:'', html:'<div class="map-poke-marker">❓</div>', iconSize:[28,28] });
+      pokemonHintMarkers.push(L.marker([pt.lat, pt.lon], { icon }).addTo(leafletMap));
+    });
   } else {
-    pokemonHintMarker.setLatLng([hintTargetPoint.lat, hintTargetPoint.lon]);
+    pokemonHintMarkers.forEach((m, i) => { if (hintTargetPoints[i]) m.setLatLng([hintTargetPoints[i].lat, hintTargetPoints[i].lon]); });
   }
   refitMapView();
 }
 
-const PIN_MAX_DISTANCE_KM = 0.6;      // distance maximale (réaliste à pied) à laquelle le repère est placé
-const PIN_TRIGGER_RADIUS_KM = 0.03;   // ~30 m : rayon en dessous duquel atteindre le repère déclenche la rencontre
+const PIN_MAX_DISTANCE_KM = 0.6;      // distance maximale (réaliste à pied) à laquelle un repère est placé
+const PIN_TRIGGER_RADIUS_KM = 0.03;   // ~30 m : rayon en dessous duquel atteindre un repère déclenche la rencontre
 
-// Vérifie si le joueur est physiquement arrivé au repère sur la carte ; si oui, déclenche la rencontre
-// tout de suite, sans attendre le quota de distance cumulée classique. Appelé à chaque mise à jour de position.
+// Vérifie si le joueur est physiquement arrivé à L'UN DES repères sur la carte ; si oui, déclenche la
+// rencontre tout de suite, sans attendre le quota de distance cumulée classique.
 function checkPinProximity(){
-  if (!leafletMap || !hintTargetPoint || !mapPosition) return;
+  if (!leafletMap || !hintTargetPoints.length || !mapPosition) return;
   if (currentEncounter || currentEgg || isSpawningEncounter) return;
-  const distToTargetKm = calculateDistance(mapPosition.lat, mapPosition.lon, hintTargetPoint.lat, hintTargetPoint.lon);
-  if (distToTargetKm <= PIN_TRIGGER_RADIUS_KM){
+  const reached = hintTargetPoints.some(pt =>
+    calculateDistance(mapPosition.lat, mapPosition.lon, pt.lat, pt.lon) <= PIN_TRIGGER_RADIUS_KM
+  );
+  if (reached){
     showToast('🎯 Repère atteint !', 'green');
     triggerNextSpawn();
   }
@@ -2614,7 +2629,7 @@ function initMapIfNeeded(){
   }).addTo(leafletMap);
   setTimeout(() => leafletMap.invalidateSize(), 100);
   if (mapPosition) updateMapPlayerPosition(mapPosition.lat, mapPosition.lon, usingRealGPS);
-  updatePokemonHintMarker();
+  updatePokemonHintMarkers();
 }
 
 document.getElementById('map-toggle-btn').addEventListener('click', () => {
@@ -2697,7 +2712,7 @@ function processDistance(dist, isTest){
     }
     distSinceLastEncounter += dist;
     updateRadar(distSinceLastEncounter);
-    updatePokemonHintMarker();
+    updatePokemonHintMarkers();
     if (!isSpawningEncounter && distSinceLastEncounter >= nextTarget){
       triggerNextSpawn();
     }
