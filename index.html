@@ -718,7 +718,28 @@ const RANK_TITLES = [
 /* --- Succès --- */
 function catchCount(){ return Object.keys(pokedex).length; }
 function shinyCount(){ return Object.values(pokedex).filter(p => p.isShiny).length; }
-function legendaryCount(){ return Object.values(pokedex).filter(p => p.isLegendary).length; }
+function legendaryCount(){ return Object.keys(pokedex).filter(k => pokedexEntryDisplay(k)?.isLegendary).length; }
+
+// Reconstitue les infos d'affichage (nom, types, sprites...) d'une capture à partir du cache API,
+// au lieu de les dupliquer dans `pokedex`. Ne garde en dur sur l'entrée que id/isShiny/date.
+// Repli sur l'entrée elle-même si jamais apiCache ne l'a pas (compatibilité anciennes sauvegardes).
+function pokedexEntryDisplay(key){
+  const entry = pokedex[key];
+  if (!entry) return null;
+  const cached = apiCache[entry.id];
+  const base = cached || entry;
+  return {
+    id: entry.id,
+    name: base.name,
+    types: base.types || [],
+    thumb: base.thumb,
+    image: base.image,
+    shinyImage: base.shinyImage,
+    isLegendary: !!base.isLegendary,
+    isShiny: !!entry.isShiny,
+    date: entry.date
+  };
+}
 
 const ACHIEVEMENTS = [
   // Captures
@@ -812,8 +833,9 @@ function countCaughtByType(){
   const counts = {};
   Object.keys(TYPE_INFO).forEach(t => counts[t] = new Set());
   const seenIds = new Set();
-  Object.values(pokedex).forEach(p => {
-    if (seenIds.has(p.id)) return;
+  Object.keys(pokedex).forEach(k => {
+    const p = pokedexEntryDisplay(k);
+    if (!p || seenIds.has(p.id)) return;
     seenIds.add(p.id);
     (p.types || []).forEach(t => { if (counts[t]) counts[t].add(p.id); });
   });
@@ -926,11 +948,12 @@ function setCompanion(pokedexKey){
   trainer.companionId = pokedexKey;
   saveAll();
   renderCompanion();
-  showToast('🐾 ' + (pokedex[pokedexKey] ? pokedex[pokedexKey].name : 'Pokémon') + ' est maintenant ton compagnon !', 'gold');
+  const mon = pokedexEntryDisplay(pokedexKey);
+  showToast('🐾 ' + (mon ? mon.name : 'Pokémon') + ' est maintenant ton compagnon !', 'gold');
 }
 function renderCompanion(){
   const label = document.getElementById('companion-label');
-  const mon = trainer.companionId ? pokedex[trainer.companionId] : null;
+  const mon = trainer.companionId ? pokedexEntryDisplay(trainer.companionId) : null;
   label.innerText = mon ? mon.name : 'Aucun';
   document.getElementById('companion-chip').title = mon
     ? mon.name + ' est ton compagnon : +1 bonbon tous les 5 km parcourus'
@@ -1285,15 +1308,26 @@ document.getElementById('reset-btn').addEventListener('click', resetGame);
    UTILITAIRES
 ========================================================= */
 function saveAll(){
-  try{
-    localStorage.setItem('myPokedex', JSON.stringify(pokedex));
-    localStorage.setItem('pokeApiCache', JSON.stringify(apiCache));
-    localStorage.setItem('trainerState', JSON.stringify(trainer));
-  }catch(e){
-    // Quota localStorage dépassé (Pokédex/cache trop volumineux) : on garde le jeu jouable
-    // en mémoire mais on prévient l'utilisateur pour qu'il exporte sa sauvegarde.
-    console.warn('Stockage local plein', e);
-    showToast('⚠️ Stockage plein — pensez à exporter votre sauvegarde !', 'gold');
+  // Chaque clé est sauvegardée indépendamment, et trainerState (XP, distance, streak, niveau...)
+  // est écrit EN PREMIER : c'est la donnée la plus critique pour la progression du joueur. Avant,
+  // les trois écritures étaient dans un seul try/catch dans l'ordre pokedex -> apiCache -> trainerState ;
+  // si le quota localStorage était dépassé dès pokeApiCache (le plus volumineux, avec sprites et
+  // descriptions de centaines de Pokémon), l'exception coupait la suite et trainerState n'était
+  // JAMAIS sauvegardé, sans que rien ne le signale clairement au joueur au-delà d'un toast générique.
+  let quotaHit = false;
+  try{ localStorage.setItem('trainerState', JSON.stringify(trainer)); }
+  catch(e){ quotaHit = true; console.warn('Échec sauvegarde trainerState', e); }
+
+  try{ localStorage.setItem('myPokedex', JSON.stringify(pokedex)); }
+  catch(e){ quotaHit = true; console.warn('Échec sauvegarde myPokedex', e); }
+
+  try{ localStorage.setItem('pokeApiCache', JSON.stringify(apiCache)); }
+  catch(e){ quotaHit = true; console.warn('Échec sauvegarde pokeApiCache', e); }
+
+  if (quotaHit){
+    // Stockage local plein : le jeu reste jouable en mémoire pour la session en cours,
+    // mais on prévient clairement le joueur pour qu'il exporte sa sauvegarde avant de perdre des données.
+    showToast('⚠️ Stockage plein — exportez votre sauvegarde pour ne rien perdre !', 'gold');
   }
 }
 
@@ -2517,7 +2551,7 @@ function resolveCaptureSuccess(mon, wasPerfect){
   const bigCatch = mon.isLegendary || shiny || wasRaid;
   if (wasPerfect) trainer._perfectThrows = (trainer._perfectThrows || 0) + 1;
   if (isNew){
-    pokedex[key] = { ...mon, isShiny: shiny, date: new Date().toLocaleDateString('fr-FR') };
+    pokedex[key] = { id: mon.id, isShiny: shiny, date: new Date().toLocaleDateString('fr-FR') };
     renderPokedex();
     addXP(wasRaid ? 220 : (mon.isLegendary ? 150 : (shiny ? 80 : 40)));
     let label = '✅ ' + mon.name + (shiny ? ' ✨ chromatique' : '') + ' capturé et ajouté au Pokédex !';
@@ -2631,7 +2665,7 @@ async function tryEvolve(mon){
   try{
     const evolvedMon = await fetchPokemonData(target.id);
     const wasNew = !pokedex[evolvedMon.id];
-    pokedex[evolvedMon.id] = { ...evolvedMon, date: new Date().toLocaleDateString('fr-FR') };
+    pokedex[evolvedMon.id] = { id: evolvedMon.id, date: new Date().toLocaleDateString('fr-FR') };
     trainer._hasEvolved = true;
     trainer._evolveCount = (trainer._evolveCount || 0) + 1;
     saveAll();
@@ -2737,8 +2771,8 @@ function renderPokedex(){
   const sortBy = sortEl ? sortEl.value : 'id';
   const shinyOnly = shinyOnlyEl ? shinyOnlyEl.checked : false;
 
-  if (search) keys = keys.filter(k => pokedex[k].name.toLowerCase().includes(search));
-  if (typeFilter) keys = keys.filter(k => (pokedex[k].types || []).includes(typeFilter));
+  if (search) keys = keys.filter(k => (pokedexEntryDisplay(k)?.name || '').toLowerCase().includes(search));
+  if (typeFilter) keys = keys.filter(k => (pokedexEntryDisplay(k)?.types || []).includes(typeFilter));
   if (shinyOnly) keys = keys.filter(k => pokedex[k].isShiny);
 
   if (Object.keys(pokedex).length === 0){
@@ -2751,7 +2785,7 @@ function renderPokedex(){
   }
 
   if (sortBy === 'name'){
-    keys.sort((a,b) => pokedex[a].name.localeCompare(pokedex[b].name, 'fr'));
+    keys.sort((a,b) => (pokedexEntryDisplay(a)?.name || '').localeCompare(pokedexEntryDisplay(b)?.name || '', 'fr'));
   } else if (sortBy === 'date'){
     keys.sort((a,b) => parseCaptureDate(pokedex[b].date) - parseCaptureDate(pokedex[a].date));
   } else {
@@ -2759,7 +2793,8 @@ function renderPokedex(){
   }
 
   list.innerHTML = keys.map(key => {
-    const p = pokedex[key];
+    const p = pokedexEntryDisplay(key);
+    if (!p) return '';
     return `
       <div class="pokedex-item ${p.isLegendary ? 'legendary':''} ${p.isShiny ? 'shiny':''}" onclick="viewCaughtPokemon(${p.id}, ${!!p.isShiny})">
         <img src="${p.isShiny ? (p.shinyImage || p.thumb) : p.thumb}" alt="${p.name}">
