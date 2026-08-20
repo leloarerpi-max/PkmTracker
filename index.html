@@ -638,7 +638,20 @@ function computeCaptureChance(mon, zone, ballKey, isRaid){
   return Math.min(0.97, Math.max(0.05, chance));
 }
 
-let nextTarget = trainer.nextTarget || generateRandomDistance();
+// Ramène une cible de recherche (km) dans la fourchette actuellement autorisée (0,5 à 2,5 km, ajustée
+// par l'Encens/le week-end). Utilisé à la fois par generateRandomDistance() pour les nouvelles cibles,
+// et au chargement d'une sauvegarde existante : une cible sauvegardée AVANT ce réglage (par ex. 4,5 km,
+// du temps où la fourchette allait jusqu'à 5 km) était chargée telle quelle sans jamais repasser par
+// cette limite, ce qui faisait rester le joueur au-dessus de 2,5 km indéfiniment malgré la mise à jour.
+function clampDistanceTarget(value){
+  const incenseFactor = isIncenseActive() ? 0.5 : 1;
+  const weekendFactor = isWeekendBoost() ? 0.7 : 1;
+  const absoluteMax = 2.5 * incenseFactor * weekendFactor;
+  const absoluteMin = 0.5 * incenseFactor * weekendFactor;
+  return parseFloat(Math.min(absoluteMax, Math.max(absoluteMin, value)).toFixed(1));
+}
+
+let nextTarget = trainer.nextTarget ? clampDistanceTarget(trainer.nextTarget) : generateRandomDistance();
 
 /* --- Etat de la carte GPS --- */
 let leafletMap = null;
@@ -1301,7 +1314,9 @@ function generateRandomDistance(previousTarget){
     const minAllowed = previousTarget * 0.6;
     value = Math.min(maxAllowed, Math.max(minAllowed, value));
   }
-  return parseFloat(value.toFixed(1));
+  // Quel que soit le résultat de l'adoucissement ci-dessus, on ne dépasse JAMAIS le plafond/plancher
+  // absolu de la fourchette actuelle (voir clampDistanceTarget).
+  return clampDistanceTarget(value);
 }
 
 function calculateDistance(lat1, lon1, lat2, lon2){
@@ -1755,7 +1770,7 @@ function importSave(evt){
       // c'est précisément ce qui causait "distance énorme / progression perdue" après un import.
       totalDistance = trainer.totalDistance;
       distSinceLastEncounter = trainer.distSinceLastEncounter;
-      nextTarget = trainer.nextTarget || generateRandomDistance();
+      nextTarget = trainer.nextTarget ? clampDistanceTarget(trainer.nextTarget) : generateRandomDistance();
       interruptedProgress = trainer.interruptedProgress || null;
       saveAll();
       renderPokedex(); renderTrainer(); renderBalls(); renderCandies(); renderStreak(); renderQuests();
@@ -3058,7 +3073,7 @@ function resolveEncounterEnd(){
     // restaure telle quelle au lieu de générer une toute nouvelle distance aléatoire, pour ne jamais
     // donner au joueur l'impression d'avoir perdu les kilomètres déjà parcourus.
     distSinceLastEncounter = interruptedProgress.dist;
-    nextTarget = interruptedProgress.target;
+    nextTarget = clampDistanceTarget(interruptedProgress.target);
     interruptedProgress = null;
   } else {
     nextTarget = generateRandomDistance(nextTarget); // adoucit l'écart par rapport à la distance qui vient d'être complétée
