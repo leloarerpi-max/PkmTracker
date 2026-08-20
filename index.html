@@ -235,12 +235,15 @@
   .pokedex-item.shiny{ border-color:var(--gold); }
   .pokedex-empty{ grid-column:1/-1; color:var(--ink-dim); text-align:center; font-size:0.82em; padding:10px 0; }
 
-  .pokedex-tools{ display:flex; gap:6px; margin-bottom:8px; }
-  .pokedex-tools input[type="text"]{ flex:1; background:var(--bg-card); border:1px solid var(--line);
+  .pokedex-tools{ display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
+  .pokedex-tools input[type="text"]{ flex:1; min-width:120px; background:var(--bg-card); border:1px solid var(--line);
     color:var(--ink); border-radius:10px; padding:7px 10px; font-size:0.78em; font-family:'Poppins',sans-serif; }
   .pokedex-tools input[type="text"]:focus{ outline:none; border-color:var(--blue); }
   .pokedex-tools select{ background:var(--bg-card); border:1px solid var(--line); color:var(--ink);
     border-radius:10px; padding:7px 8px; font-size:0.78em; font-family:'Poppins',sans-serif; }
+  .pokedex-tools label.shiny-filter{ display:flex; align-items:center; gap:5px; font-size:0.72em; color:var(--ink-dim);
+    background:var(--bg-card); border:1px solid var(--line); border-radius:10px; padding:7px 10px; cursor:pointer; user-select:none; }
+  .pokedex-tools label.shiny-filter input{ margin:0; }
 
   .incense-chip{ cursor:pointer; }
   .incense-chip.active{ border-color:var(--gold); color:var(--gold); }
@@ -357,21 +360,43 @@
     80%{ transform:translateX(3px); }
   }
   .stage.shake{ animation:stageShake 0.4s ease-in-out; }
+
+  /* --- Indicateur de connexion --- */
+  .offline-banner{ margin-top:12px; background:rgba(239,77,94,0.14); border:1px solid var(--red); border-radius:14px;
+    padding:9px 12px; font-size:0.78em; font-weight:700; text-align:center; color:var(--red); display:none; }
+  .offline-banner.show{ display:block; }
+
+  /* --- Rappel d'export de sauvegarde --- */
+  .export-reminder{ margin-top:12px; background:rgba(110,231,255,0.1); border:1px solid var(--blue); border-radius:14px;
+    padding:9px 12px; font-size:0.76em; font-weight:600; text-align:center; color:var(--blue); display:none; }
+  .export-reminder.show{ display:block; }
+
+  /* --- Accessibilité : réduction des animations --- */
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{
+      animation-duration:0.001ms !important;
+      animation-iteration-count:1 !important;
+      transition-duration:0.001ms !important;
+      scroll-behavior:auto !important;
+    }
+  }
+  .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 </style>
 </head>
 <body>
 
-<div class="toast" id="toast"></div>
-<canvas id="weather-canvas"></canvas>
-<div id="levelup-flash"></div>
-<div id="encounter-flash"></div>
-<canvas id="confetti-canvas"></canvas>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<canvas id="weather-canvas" aria-hidden="true"></canvas>
+<div id="levelup-flash" aria-hidden="true"></div>
+<div id="encounter-flash" aria-hidden="true"></div>
+<canvas id="confetti-canvas" aria-hidden="true"></canvas>
 
 <div class="card">
 
   <header class="top">
     <div class="brand">
-      <svg class="ball-logo" viewBox="0 0 100 100">
+      <svg class="ball-logo" viewBox="0 0 100 100" role="img" aria-label="Poké Ball">
         <circle cx="50" cy="50" r="46" fill="#fff" stroke="#141a29" stroke-width="4"/>
         <path d="M4 50a46 46 0 0 1 92 0Z" fill="#ef4d5e" stroke="#141a29" stroke-width="4"/>
         <rect x="4" y="46" width="92" height="8" fill="#141a29"/>
@@ -388,18 +413,20 @@
     <div class="chip" id="streak-chip">🔥 <span id="streak-count">0</span> j.</div>
     <div class="chip" id="candy-chip">🍬 <span id="candy-count">0</span></div>
     <div class="chip" id="ball-counter">
-      <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="#fff" stroke="#141a29" stroke-width="6"/><path d="M4 50a46 46 0 0 1 92 0Z" fill="#ef4d5e" stroke="#141a29" stroke-width="6"/><rect x="4" y="46" width="92" height="8" fill="#141a29"/><circle cx="50" cy="50" r="12" fill="#fff" stroke="#141a29" stroke-width="6"/></svg>
+      <svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="#fff" stroke="#141a29" stroke-width="6"/><path d="M4 50a46 46 0 0 1 92 0Z" fill="#ef4d5e" stroke="#141a29" stroke-width="6"/><rect x="4" y="46" width="92" height="8" fill="#141a29"/><circle cx="50" cy="50" r="12" fill="#fff" stroke="#141a29" stroke-width="6"/></svg>
       <span id="ball-count">5</span>
     </div>
-    <div class="chip incense-chip" id="incense-chip" title="Activer l'Encens (booste les rencontres 15 min)">🌸 <span id="incense-count">0</span></div>
+    <div class="chip incense-chip" id="incense-chip" role="button" tabindex="0" aria-label="Activer l'Encens, booste les rencontres pendant 15 minutes" title="Activer l'Encens (booste les rencontres 15 min)">🌸 <span id="incense-count">0</span></div>
     <div class="chip weather-chip" id="weather-chip" title="Météo locale : influence les types de Pokémon">🌤️ <span id="weather-label">--</span></div>
     <div class="chip berry-chip" id="berry-chip" title="Baies trouvées en marchant, utilisables pendant une capture">🍓 <span id="berry-count">0</span></div>
     <div class="chip companion-chip" id="companion-chip" title="Ton Pokémon compagnon (choisi depuis le Pokédex)">🐾 <span id="companion-label">Aucun</span></div>
-    <div class="chip mute-chip clickable" id="mute-chip" title="Couper / activer le son">🔊</div>
-    <div class="chip clickable" id="theme-chip" title="Passer en mode clair">🌙</div>
+    <div class="chip mute-chip clickable" id="mute-chip" role="button" tabindex="0" aria-label="Couper ou activer le son" title="Couper / activer le son">🔊</div>
+    <div class="chip clickable" id="theme-chip" role="button" tabindex="0" aria-label="Changer de thème clair ou sombre" title="Passer en mode clair">🌙</div>
   </div>
 
   <div class="weekend-banner" id="weekend-banner">🎉 Boost week-end actif : XP doublée et rencontres plus fréquentes !</div>
+  <div class="offline-banner" id="offline-banner" role="status" aria-live="polite">📴 Hors-ligne — la marche continue d'être suivie, mais les images/API Pokémon peuvent être indisponibles.</div>
+  <div class="export-reminder" id="export-reminder" role="status"></div>
 
   <div class="trainer-row">
     <div class="labels">
@@ -411,7 +438,7 @@
 
   <div class="radar-wrap">
     <div class="radar">
-      <svg width="76" height="76">
+      <svg width="76" height="76" aria-hidden="true">
         <circle cx="38" cy="38" r="32" fill="none" stroke="#374266" stroke-width="7"/>
         <circle id="radar-progress" cx="38" cy="38" r="32" fill="none" stroke="#4fd88a" stroke-width="7"
                 stroke-linecap="round" stroke-dasharray="201" stroke-dashoffset="201"/>
@@ -425,7 +452,7 @@
     </div>
   </div>
 
-  <p id="status">En attente du signal GPS...</p>
+  <p id="status" role="status" aria-live="polite">En attente du signal GPS...</p>
   <div class="test-btn-row">
     <button class="test-btn" id="test-btn-250" type="button">🧪 +250 m</button>
     <button class="test-btn" id="test-btn-1000" type="button">🧪 +1 km</button>
@@ -454,7 +481,7 @@
 
   <div class="progress-chart-wrap">
     <h3>📈 Progression (14 derniers jours)</h3>
-    <canvas id="progress-chart" width="400" height="110"></canvas>
+    <canvas id="progress-chart" width="400" height="110" role="img" aria-label="Graphique des kilomètres parcourus sur les 14 derniers jours"></canvas>
   </div>
 
   <div class="achievements" id="achievements-panel">
@@ -473,15 +500,21 @@
     <div class="stat-box"><div class="val" id="stat-record">0.00 km</div><div class="lbl">Record</div></div>
   </div>
 
-  <div class="stage" id="pokemon-area">
+  <div class="stage" id="pokemon-area" role="region" aria-label="Zone de rencontre Pokémon" aria-live="polite">
     <p class="hint">Marchez pour commencer la recherche !</p>
   </div>
 
   <div class="pokedex-container">
     <h3><span class="pixel" style="font-size:0.9em;">POKÉDEX</span> <span id="caught-count" class="count-badge">0</span><span style="color:var(--ink-dim); font-weight:600;">/ 1025</span></h3>
     <div class="pokedex-tools">
-      <input type="text" id="pokedex-search" placeholder="Rechercher un Pokémon...">
-      <select id="pokedex-filter-type"><option value="">Tous types</option></select>
+      <input type="text" id="pokedex-search" placeholder="Rechercher un Pokémon..." aria-label="Rechercher un Pokémon">
+      <select id="pokedex-filter-type" aria-label="Filtrer par type"><option value="">Tous types</option></select>
+      <select id="pokedex-sort" aria-label="Trier le Pokédex">
+        <option value="id">Tri : N° Pokédex</option>
+        <option value="name">Tri : Nom (A-Z)</option>
+        <option value="date">Tri : Date (récent)</option>
+      </select>
+      <label class="shiny-filter"><input type="checkbox" id="pokedex-shiny-only"> ✨ Chromatiques uniquement</label>
     </div>
     <div class="pokedex-grid" id="pokedex-list"></div>
   </div>
@@ -536,6 +569,8 @@ trainer.totalDistance = trainer.totalDistance || 0;
 trainer.distSinceLastEncounter = trainer.distSinceLastEncounter || 0;
 trainer.nextTarget = trainer.nextTarget || null; // null = pas encore de cible générée (nouvelle partie)
 trainer.encounterPending = !!trainer.encounterPending;
+trainer.interruptedProgress = trainer.interruptedProgress || null; // progression "mise de côté" par un Raid en attente de restauration (voir resolveEncounterEnd)
+trainer.lastExportAt = trainer.lastExportAt || null;
 
 // Ces trois valeurs pilotent la distance totale, la progression vers la prochaine rencontre et le
 // déclenchement des Raids. Avant, elles n'étaient JAMAIS sauvegardées : elles repartaient de zéro à
@@ -544,6 +579,12 @@ trainer.encounterPending = !!trainer.encounterPending;
 let totalDistance = trainer.totalDistance;
 let lastPosition = null;   // {lat, lon, t} — ancre GPS, se régénère naturellement au premier point reçu
 let distSinceLastEncounter = trainer.distSinceLastEncounter;
+// Progression "mise de côté" quand un Raid interrompt la marche vers la PROCHAINE rencontre normale :
+// {dist, target} le temps que le Raid soit résolu, puis restaurée telle quelle (voir resolveEncounterEnd)
+// au lieu d'être remplacée par une toute nouvelle distance aléatoire. Sans ça, un Raid qui apparaît
+// après par exemple 4 km de marche sur les 4,5 km requis faisait perdre ces 4 km au profit d'une
+// nouvelle cible tirée au hasard — ce qui donnait l'impression très frustrante d'avoir tout perdu.
+let interruptedProgress = trainer.interruptedProgress || null;
 
 // Synchronise ces valeurs dans l'objet trainer (donc dans la sauvegarde et l'export) à chaque changement,
 // ET rafraîchit systématiquement l'affichage : sans ça, une valeur pouvait changer en interne (import,
@@ -553,6 +594,7 @@ function syncDistanceState(){
   trainer.totalDistance = totalDistance;
   trainer.distSinceLastEncounter = distSinceLastEncounter;
   trainer.nextTarget = nextTarget;
+  trainer.interruptedProgress = interruptedProgress;
   // Mémorise qu'une rencontre était en cours : si le joueur ferme le jeu à ce moment-là, on lui en
   // redonnera une immédiatement au retour, au lieu de lui faire refaire toute la distance (ce qui
   // donnait l'impression de perdre sa progression).
@@ -831,6 +873,37 @@ function isWeekendBoost(){
 }
 function renderWeekendBanner(){
   document.getElementById('weekend-banner').classList.toggle('show', isWeekendBoost());
+}
+
+/* =========================================================
+   INDICATEUR HORS-LIGNE
+========================================================= */
+function renderOnlineStatus(){
+  const banner = document.getElementById('offline-banner');
+  if (!banner) return;
+  banner.classList.toggle('show', !navigator.onLine);
+}
+window.addEventListener('online', () => { renderOnlineStatus(); showToast('🌐 Connexion rétablie.', 'green'); });
+window.addEventListener('offline', () => { renderOnlineStatus(); showToast('📴 Connexion perdue — la marche continue d\'être suivie.', 'gold'); });
+
+/* =========================================================
+   RAPPEL D'EXPORT DE SAUVEGARDE
+========================================================= */
+const EXPORT_REMINDER_DAYS = 7;
+function renderExportReminder(){
+  const el = document.getElementById('export-reminder');
+  if (!el) return;
+  if (catchCount() === 0){ el.classList.remove('show'); return; }
+  const last = trainer.lastExportAt ? new Date(trainer.lastExportAt) : null;
+  const daysSince = last ? (Date.now() - last.getTime()) / 86400000 : Infinity;
+  if (daysSince >= EXPORT_REMINDER_DAYS){
+    el.innerText = last
+      ? '💾 Dernière sauvegarde exportée il y a ' + Math.floor(daysSince) + ' j. Pensez à exporter pour ne rien perdre.'
+      : '💾 Vous n\'avez jamais exporté votre sauvegarde. Pensez-y pour ne rien perdre.';
+    el.classList.add('show');
+  } else {
+    el.classList.remove('show');
+  }
 }
 
 /* =========================================================
@@ -1164,6 +1237,8 @@ renderWeeklyQuest();
 renderStreakCalendar();
 renderProgressChart();
 renderWeekendBanner();
+renderOnlineStatus();
+renderExportReminder();
 applyDayNightTheme();
 setInterval(applyDayNightTheme, 5 * 60 * 1000);
 setInterval(renderWeekendBanner, 60 * 60 * 1000);
@@ -1176,11 +1251,16 @@ document.getElementById('test-btn-1000').addEventListener('click', () => process
 document.getElementById('test-btn-5000').addEventListener('click', () => processDistance(5.0, true));
 
 document.getElementById('incense-chip').addEventListener('click', activateIncense);
+document.getElementById('incense-chip').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); activateIncense(); } });
 document.getElementById('mute-chip').addEventListener('click', toggleMute);
+document.getElementById('mute-chip').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggleMute(); } });
 document.getElementById('theme-chip').addEventListener('click', toggleLightMode);
+document.getElementById('theme-chip').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggleLightMode(); } });
 
 document.getElementById('pokedex-search').addEventListener('input', renderPokedex);
 document.getElementById('pokedex-filter-type').addEventListener('change', renderPokedex);
+document.getElementById('pokedex-sort').addEventListener('change', renderPokedex);
+document.getElementById('pokedex-shiny-only').addEventListener('change', renderPokedex);
 
 document.getElementById('add-distance-btn').addEventListener('click', promptManualDistance);
 document.getElementById('export-btn').addEventListener('click', exportSave);
@@ -1204,11 +1284,24 @@ function saveAll(){
   }
 }
 
-function generateRandomDistance(){
-  const base = Math.random() * (5.0 - 0.5) + 0.5;
+function generateRandomDistance(previousTarget){
+  const base = Math.random() * (2.5 - 0.5) + 0.5; // fourchette resserrée : 0,5 à 2,5 km (au lieu de 0,5 à 5 km)
   const incenseFactor = isIncenseActive() ? 0.5 : 1;
   const weekendFactor = isWeekendBoost() ? 0.7 : 1;
-  return parseFloat((base * incenseFactor * weekendFactor).toFixed(1));
+  let value = base * incenseFactor * weekendFactor;
+  // Adoucit l'écart entre deux recherches consécutives : la distance suivante ne doit ni exploser ni
+  // s'effondrer d'un coup par rapport à celle qui vient d'être complétée (qu'elle ait été terminée en
+  // marchant tout droit ou en atteignant un repère ❓ sur la carte — c'est le même système dans les deux
+  // cas). Sans cette limite, capturer un Pokémon après une courte recherche pouvait être immédiatement
+  // suivi d'une exigence bien plus longue, ce qui donnait l'impression très frustrante d'être pénalisé
+  // juste après une capture. Ne s'applique qu'à partir de la 2e recherche d'une partie (previousTarget
+  // fourni) — la toute première recherche reste un tirage libre.
+  if (previousTarget){
+    const maxAllowed = previousTarget * 1.5;
+    const minAllowed = previousTarget * 0.6;
+    value = Math.min(maxAllowed, Math.max(minAllowed, value));
+  }
+  return parseFloat(value.toFixed(1));
 }
 
 function calculateDistance(lat1, lon1, lat2, lon2){
@@ -1373,6 +1466,7 @@ function renderMuteButton(){
   const chip = document.getElementById('mute-chip');
   chip.innerText = trainer.muted ? '🔇' : '🔊';
   chip.title = trainer.muted ? 'Réactiver le son' : 'Couper le son';
+  chip.setAttribute('aria-label', trainer.muted ? 'Réactiver le son' : 'Couper le son');
 }
 
 /* =========================================================
@@ -1456,6 +1550,7 @@ function renderThemeButton(){
   if (!chip) return;
   chip.innerText = trainer.lightMode ? '☀️' : '🌙';
   chip.title = trainer.lightMode ? 'Repasser en mode sombre' : 'Passer en mode clair';
+  chip.setAttribute('aria-label', trainer.lightMode ? 'Repasser en mode sombre' : 'Passer en mode clair');
 }
 
 /* =========================================================
@@ -1618,6 +1713,9 @@ function exportSave(){
   link.download = 'pokemon-gps-go-save-' + todayStr() + '.json';
   link.click();
   URL.revokeObjectURL(url);
+  trainer.lastExportAt = new Date().toISOString();
+  saveAll();
+  renderExportReminder();
   showToast('💾 Sauvegarde exportée !');
 }
 
@@ -1651,15 +1749,19 @@ function importSave(evt){
       trainer.totalDistance = trainer.totalDistance || 0;
       trainer.distSinceLastEncounter = trainer.distSinceLastEncounter || 0;
       trainer.encounterPending = !!trainer.encounterPending;
+      trainer.lastExportAt = trainer.lastExportAt || null;
+      trainer.interruptedProgress = trainer.interruptedProgress || null;
       // Restaure les variables actives à partir de la sauvegarde importée (au lieu de repartir de zéro) :
       // c'est précisément ce qui causait "distance énorme / progression perdue" après un import.
       totalDistance = trainer.totalDistance;
       distSinceLastEncounter = trainer.distSinceLastEncounter;
       nextTarget = trainer.nextTarget || generateRandomDistance();
+      interruptedProgress = trainer.interruptedProgress || null;
       saveAll();
       renderPokedex(); renderTrainer(); renderBalls(); renderCandies(); renderStreak(); renderQuests();
       renderAchievements(); renderTypeBadges(); renderStats(); renderIncense(); renderMuteButton(); renderThemeButton();
       renderCompanion(); renderBerries(); ensureWeeklyQuest(); renderWeeklyQuest(); renderStreakCalendar(); renderProgressChart();
+      renderExportReminder();
       document.getElementById('km').innerText = totalDistance.toFixed(3);
       updateRadar(distSinceLastEncounter);
       updatePokemonHintMarkers();
@@ -2338,7 +2440,18 @@ function startNeedleAnimation(mon){
   captureTimer = requestAnimationFrame(step);
 
   document.getElementById('throw-btn')?.addEventListener('click', () => attemptCapture(mon));
-  document.getElementById('flee-btn')?.addEventListener('click', () => endEncounter(mon));
+  document.getElementById('flee-btn')?.addEventListener('click', () => confirmAndFlee(mon));
+}
+
+// Demande confirmation avant de laisser partir un Pokémon rare (légendaire, chromatique ou de Raid) :
+// pur garde-fou anti-clic-accidentel, ne change RIEN aux probabilités ni à la logique de capture.
+function confirmAndFlee(mon){
+  const isPrecious = mon.isLegendary || currentEncounterShiny || currentEncounterRaid;
+  if (isPrecious){
+    const label = currentEncounterShiny ? 'chromatique' : (currentEncounterRaid ? 'de Raid' : 'légendaire');
+    if (!confirm('Laisser partir ' + mon.name + ' (' + label + ') ? Cette rencontre est rare, êtes-vous sûr ?')) return;
+  }
+  endEncounter(mon);
 }
 
 function attemptCapture(mon){
@@ -2585,6 +2698,16 @@ function populateTypeFilter(){
   });
 }
 
+// Convertit la date française "jj/mm/aaaa" stockée sur chaque capture en timestamp triable.
+// Purement un utilitaire d'affichage/tri : ne touche à aucune donnée de jeu.
+function parseCaptureDate(str){
+  if (!str) return 0;
+  const parts = str.split('/');
+  if (parts.length !== 3) return 0;
+  const [d, m, y] = parts.map(Number);
+  return new Date(y, (m||1) - 1, d||1).getTime();
+}
+
 function renderPokedex(){
   const list = document.getElementById('pokedex-list');
   let keys = Object.keys(pokedex);
@@ -2592,11 +2715,16 @@ function renderPokedex(){
 
   const searchEl = document.getElementById('pokedex-search');
   const typeEl = document.getElementById('pokedex-filter-type');
+  const sortEl = document.getElementById('pokedex-sort');
+  const shinyOnlyEl = document.getElementById('pokedex-shiny-only');
   const search = (searchEl ? searchEl.value : '').trim().toLowerCase();
   const typeFilter = typeEl ? typeEl.value : '';
+  const sortBy = sortEl ? sortEl.value : 'id';
+  const shinyOnly = shinyOnlyEl ? shinyOnlyEl.checked : false;
 
   if (search) keys = keys.filter(k => pokedex[k].name.toLowerCase().includes(search));
   if (typeFilter) keys = keys.filter(k => (pokedex[k].types || []).includes(typeFilter));
+  if (shinyOnly) keys = keys.filter(k => pokedex[k].isShiny);
 
   if (Object.keys(pokedex).length === 0){
     list.innerHTML = '<div class="pokedex-empty">Aucun Pokémon capturé pour le moment.</div>';
@@ -2607,7 +2735,14 @@ function renderPokedex(){
     return;
   }
 
-  keys.sort((a,b) => pokedex[a].id - pokedex[b].id);
+  if (sortBy === 'name'){
+    keys.sort((a,b) => pokedex[a].name.localeCompare(pokedex[b].name, 'fr'));
+  } else if (sortBy === 'date'){
+    keys.sort((a,b) => parseCaptureDate(pokedex[b].date) - parseCaptureDate(pokedex[a].date));
+  } else {
+    keys.sort((a,b) => pokedex[a].id - pokedex[b].id);
+  }
+
   list.innerHTML = keys.map(key => {
     const p = pokedex[key];
     return `
@@ -2748,7 +2883,13 @@ function clearHintMarkers(){
   pokemonHintMarkers = [];
 }
 
-const HINT_REGENERATE_BUFFER_KM = 0.4; // au-delà de PIN_MAX_DISTANCE_KM + cette marge, on considère que le joueur s'est éloigné de TOUS les repères
+const HINT_REGENERATE_BUFFER_KM = 0.15; // au-delà de PIN_MAX_DISTANCE_KM + cette marge, on considère que le joueur s'est éloigné de TOUS les repères
+// Abaissé de 0.4 à 0.15 km : avec l'ancienne marge, il fallait s'éloigner de PRÈS DE 1 KM du repère le
+// plus proche avant qu'un nouveau jeu de repères apparaisse autour de soi. En pratique, partir dans la
+// mauvaise direction (ou faire demi-tour) laissait les repères "collés" loin derrière beaucoup trop
+// longtemps, donnant l'impression qu'aucun repère n'était plus jamais atteignable. Une marge plus
+// courte relocalise les repères beaucoup plus vite tout en gardant une petite tolérance contre le
+// bruit GPS normal (quelques dizaines de mètres).
 
 // Si le joueur s'éloigne de tous les repères actuels au lieu de s'en rapprocher (mauvaise direction),
 // on régénère un nouveau jeu de repères autour de sa position actuelle plutôt que de le laisser
@@ -2912,8 +3053,17 @@ function triggerNextSpawn(){
 // Appelé quand une rencontre se termine (capture réussie, échec définitif, ou fuite volontaire) :
 // c'est à ce moment seulement qu'on tire la distance à parcourir avant la rencontre suivante.
 function resolveEncounterEnd(){
-  nextTarget = generateRandomDistance();
-  distSinceLastEncounter = 0;
+  if (interruptedProgress){
+    // Un Raid avait interrompu une progression déjà entamée vers une rencontre normale : on la
+    // restaure telle quelle au lieu de générer une toute nouvelle distance aléatoire, pour ne jamais
+    // donner au joueur l'impression d'avoir perdu les kilomètres déjà parcourus.
+    distSinceLastEncounter = interruptedProgress.dist;
+    nextTarget = interruptedProgress.target;
+    interruptedProgress = null;
+  } else {
+    nextTarget = generateRandomDistance(nextTarget); // adoucit l'écart par rapport à la distance qui vient d'être complétée
+    distSinceLastEncounter = 0;
+  }
   syncDistanceState(); // sauvegarde ET rafraîchit l'affichage d'un coup
 }
 
@@ -2947,6 +3097,10 @@ function processDistance(dist, isTest){
     // Vérifie si un Raid doit apparaître (tous les RAID_EVERY_KM km parcourus au total)
     if (!isSpawningEncounter && Math.floor(totalDistance / RAID_EVERY_KM) > Math.floor(trainer.lastRaidKm / RAID_EVERY_KM)){
       trainer.lastRaidKm = totalDistance;
+      // On met de côté la progression déjà accumulée vers la prochaine rencontre normale AVANT de la
+      // remettre à zéro pour l'affichage du Raid : elle sera restaurée telle quelle une fois le Raid
+      // résolu (voir resolveEncounterEnd), au lieu d'être remplacée par une cible totalement nouvelle.
+      interruptedProgress = { dist: distSinceLastEncounter, target: nextTarget };
       spawnDirectEncounter(true);
       distSinceLastEncounter = 0;
       syncDistanceState(); // sauvegarde ET rafraîchit l'affichage
